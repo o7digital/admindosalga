@@ -1,0 +1,40 @@
+[
+  {
+    "id": "dosalga-cj-23200",
+    "siteId": "dosalga",
+    "sku": "CJBHNSNS21225",
+    "name": "Men's height-increasing shoes British retro sneakers",
+    "supplier": "CJ",
+    "cjProductUrl": "",
+    "quantityPlanned": 12,
+    "cjCost": 2815.43,
+    "cjCostCurrency": "MXN",
+    "salePrice": 3344.24,
+    "saleCurrency": "MXN",
+    "shippingIncluded": true,
+    "shippingCost": 0,
+    "platformFeeRate": 0.035,
+    "taxRate": 0,
+    "status": "review",
+    "notes": "Import CJ du 3 aout, prix source en MXN."
+  },
+  {
+    "id": "dosalga-cj-legacy-hoodie",
+    "siteId": "dosalga",
+    "sku": "CJWY2965760",
+    "name": "Hoodie",
+    "supplier": "CJ",
+    "cjProductUrl": "",
+    "quantityPlanned": 20,
+    "cjCost": 64.64,
+    "cjCostCurrency": "USD",
+    "salePrice": 1130.00,
+    "saleCurrency": "MXN",
+    "shippingIncluded": false,
+    "shippingCost": 180.00,
+    "platformFeeRate": 0.035,
+    "taxRate": 0,
+    "status": "approved",
+    "notes": "Produit historique: cout CJ en USD."
+  }
+]
