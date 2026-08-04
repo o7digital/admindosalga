@@ -1,10 +1,10 @@
 import Head from 'next/head';
 import { useEffect, useMemo, useState } from 'react';
-import { calculateProductMargin, formatCurrency, formatPercent } from '@/lib/margins';
+import { calculateProductMargin, convertCurrency, formatCurrency, formatPercent } from '@/lib/margins';
 import { sites } from '@/lib/sites';
 
 const blankProduct = {
-  siteId: 'dosalga',
+  siteId: 'dosalga-mexico',
   sku: '',
   name: '',
   supplier: 'CJ',
@@ -32,7 +32,7 @@ const statusLabels = {
 
 export default function ProductAdmin() {
   const [products, setProducts] = useState([]);
-  const [selectedSite, setSelectedSite] = useState('dosalga');
+  const [selectedSite, setSelectedSite] = useState('all');
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [query, setQuery] = useState('');
   const [editingProduct, setEditingProduct] = useState(blankProduct);
@@ -67,11 +67,15 @@ export default function ProductAdmin() {
   const summary = useMemo(() => {
     return filteredProducts.reduce((totals, product) => {
       const margin = calculateProductMargin(product);
+      const revenueMXN = convertCurrency(margin.salePrice, margin.saleCurrency, 'MXN');
+      const costMXN = convertCurrency(margin.totalCost, margin.saleCurrency, 'MXN');
+      const profitMXN = convertCurrency(margin.profit, margin.saleCurrency, 'MXN');
+
       return {
         products: totals.products + 1,
-        revenue: totals.revenue + margin.salePrice,
-        cost: totals.cost + margin.totalCost,
-        profit: totals.profit + margin.profit,
+        revenue: totals.revenue + revenueMXN,
+        cost: totals.cost + costMXN,
+        profit: totals.profit + profitMXN,
       };
     }, {
       products: 0,
@@ -101,7 +105,7 @@ export default function ProductAdmin() {
   const resetForm = () => {
     setEditingProduct({
       ...blankProduct,
-      siteId: selectedSite === 'all' ? 'dosalga' : selectedSite,
+      siteId: selectedSite === 'all' ? 'dosalga-mexico' : selectedSite,
     });
   };
 
@@ -138,15 +142,18 @@ export default function ProductAdmin() {
   return (
     <>
       <Head>
-        <title>Admin Dosalga produits</title>
-        <meta name="description" content="Admin produits Dosalga pour suivre cout CJ, shipping et marge." />
+        <title>Dosalga Admin Demo</title>
+        <meta name="description" content="Demo admin Dosalga pour comparer stores Mexico et USA, cout CJ, shipping et marge." />
       </Head>
 
       <main className="admin-shell">
         <aside className="sidebar">
-          <div>
-            <p className="eyebrow">O7 Product Ops</p>
-            <h1>Admin produits</h1>
+          <div className="brand-block">
+            <div className="brand-mark">D</div>
+            <div>
+              <p className="eyebrow">O7 Product Ops</p>
+              <h1>Dosalga Admin</h1>
+            </div>
           </div>
 
           <nav>
@@ -173,13 +180,58 @@ export default function ProductAdmin() {
         <section className="workspace">
           <header className="topbar">
             <div>
-              <p className="eyebrow">Couts CJ, shipping, marge</p>
-              <h2>Controle des produits achetes</h2>
+              <p className="eyebrow">Demo client · sans backend payant</p>
+              <h2>Mexico vs USA: achats CJ, shipping et marge nette</h2>
             </div>
             <button type="button" className="primary" onClick={resetForm}>Nouveau produit</button>
           </header>
 
           {error && <div className="alert">{error}</div>}
+
+          <section className="pitch-strip">
+            <article>
+              <strong>Le probleme</strong>
+              <span>CJ melange les devises, WooCommerce affiche un prix, mais personne ne voit la vraie marge avant achat.</span>
+            </article>
+            <article>
+              <strong>La solution</strong>
+              <span>Un admin simple: cout CJ, devise, shipping inclus ou non, prix de vente et marge immediate.</span>
+            </article>
+            <article>
+              <strong>Prix pilote</strong>
+              <span>Demo gratuite maintenant. Minimum pour le setup reel: 1,500 MXN.</span>
+            </article>
+          </section>
+
+          <section className="store-grid">
+            {sites.map((site) => {
+              const siteProducts = products.filter((product) => product.siteId === site.id);
+              const siteSummary = siteProducts.reduce((totals, product) => {
+                const margin = calculateProductMargin(product);
+                const revenueMXN = convertCurrency(margin.salePrice, margin.saleCurrency, 'MXN');
+                const profitMXN = convertCurrency(margin.profit, margin.saleCurrency, 'MXN');
+                return {
+                  revenue: totals.revenue + revenueMXN,
+                  profit: totals.profit + profitMXN,
+                };
+              }, { revenue: 0, profit: 0 });
+              const siteMargin = siteSummary.revenue > 0 ? siteSummary.profit / siteSummary.revenue : 0;
+
+              return (
+                <button
+                  key={site.id}
+                  type="button"
+                  className={`store-card ${selectedSite === site.id ? 'active' : ''}`}
+                  onClick={() => setSelectedSite(site.id)}
+                >
+                  <span>{site.market}</span>
+                  <strong>{site.name}</strong>
+                  <small>{site.domain} · {site.defaultSaleCurrency} · {site.status}</small>
+                  <b className={siteMargin < 0.25 ? 'danger' : 'success'}>{formatPercent(siteMargin)} marge demo</b>
+                </button>
+              );
+            })}
+          </section>
 
           <section className="metrics">
             <article>
@@ -220,6 +272,7 @@ export default function ProductAdmin() {
                 <table>
                   <thead>
                     <tr>
+                      <th>Store</th>
                       <th>Produit</th>
                       <th>Cout CJ</th>
                       <th>Shipping</th>
@@ -234,12 +287,16 @@ export default function ProductAdmin() {
                       return (
                         <tr key={product.id} onClick={() => editProduct(product)}>
                           <td>
+                            <strong>{sites.find((site) => site.id === product.siteId)?.market || product.siteId}</strong>
+                            <span>{sites.find((site) => site.id === product.siteId)?.domain || ''}</span>
+                          </td>
+                          <td>
                             <strong>{product.name}</strong>
                             <span>{product.sku || 'Sans SKU'} · {product.supplier}</span>
                           </td>
                           <td>
                             {formatCurrency(product.cjCost, product.cjCostCurrency)}
-                            <small>{product.cjCostCurrency === 'MXN' ? 'Import MXN' : 'Historique USD'}</small>
+                            <small>{product.cjCostCurrency === 'MXN' ? 'CJ en MXN, pas de conversion' : 'CJ en USD'}</small>
                           </td>
                           <td>
                             {product.shippingIncluded ? 'Inclus' : formatCurrency(product.shippingCost, product.shippingCurrency || product.saleCurrency)}

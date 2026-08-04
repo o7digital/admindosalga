@@ -27,8 +27,27 @@ textarea {
   top: 0;
   height: 100vh;
   padding: 28px 22px;
-  background: #121418;
+  background: #101114;
   color: #fff;
+}
+
+.brand-block {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.brand-mark {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: #e11922;
+  color: #fff;
+  font-size: 22px;
+  font-weight: 900;
 }
 
 .eyebrow {
@@ -51,7 +70,7 @@ h3 {
 }
 
 h1 {
-  font-size: 28px;
+  font-size: 24px;
 }
 
 h2 {
@@ -95,6 +114,80 @@ h3 {
   justify-content: space-between;
   gap: 16px;
   margin-bottom: 22px;
+}
+
+.pitch-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.pitch-strip article {
+  min-height: 104px;
+  padding: 16px;
+  border: 1px solid #e1e5ea;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.pitch-strip strong,
+.pitch-strip span {
+  display: block;
+}
+
+.pitch-strip strong {
+  margin-bottom: 8px;
+}
+
+.pitch-strip span {
+  color: #5d6672;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.store-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.store-card {
+  display: grid;
+  gap: 6px;
+  padding: 18px;
+  border: 1px solid #e1e5ea;
+  border-radius: 8px;
+  background: #fff;
+  color: #16181d;
+  text-align: left;
+  cursor: pointer;
+}
+
+.store-card.active,
+.store-card:hover {
+  border-color: #15171c;
+  box-shadow: 0 10px 24px rgba(17, 19, 24, 0.08);
+}
+
+.store-card span {
+  color: #e11922;
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.store-card strong {
+  font-size: 22px;
+}
+
+.store-card small {
+  color: #69727f;
+}
+
+.store-card b {
+  margin-top: 4px;
 }
 
 .primary {
@@ -198,7 +291,7 @@ textarea {
 table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 860px;
+  min-width: 980px;
 }
 
 th,
@@ -313,7 +406,8 @@ tbody tr:hover {
   }
 
   .content-grid,
-  .metrics {
+  .metrics,
+  .pitch-strip {
     grid-template-columns: 1fr;
   }
 }
@@ -331,6 +425,7 @@ tbody tr:hover {
 
   .panel-toolbar,
   .two-cols,
+  .store-grid,
   .sidebar nav {
     grid-template-columns: 1fr;
   }
