@@ -14,25 +14,41 @@ const writeProducts = async (products) => {
 
 const buildProduct = (payload) => {
   const now = new Date().toISOString();
+  const siteId = payload.siteId || payload.store || 'dosalga-mexico';
+  const saleCurrency = payload.saleCurrency || payload.currency || (siteId === 'dosalga-usa' ? 'USD' : 'MXN');
 
   return {
     id: payload.id || `product-${Date.now()}`,
-    siteId: payload.siteId || 'dosalga',
+    siteId,
+    stores: Array.isArray(payload.stores) ? payload.stores : [siteId],
     sku: String(payload.sku || '').trim(),
+    cjSku: String(payload.cjSku || payload.pid || payload.sku || '').trim(),
+    pid: String(payload.pid || '').trim(),
     name: String(payload.name || '').trim(),
+    brand: String(payload.brand || 'Dosalga').trim(),
+    category: String(payload.category || 'General').trim(),
     supplier: String(payload.supplier || 'CJ').trim(),
     cjProductUrl: String(payload.cjProductUrl || '').trim(),
     quantityPlanned: Number(payload.quantityPlanned) || 0,
+    stock: Number(payload.stock ?? payload.quantityPlanned) || 0,
     cjCost: Number(payload.cjCost) || 0,
-    cjCostCurrency: payload.cjCostCurrency || 'MXN',
+    cjCostCurrency: payload.cjCostCurrency || saleCurrency,
     salePrice: Number(payload.salePrice) || 0,
-    saleCurrency: payload.saleCurrency || 'MXN',
+    saleCurrency,
     shippingIncluded: Boolean(payload.shippingIncluded),
     shippingCost: Number(payload.shippingCost) || 0,
-    shippingCurrency: payload.shippingCurrency || payload.saleCurrency || 'MXN',
+    shippingCurrency: payload.shippingCurrency || saleCurrency,
+    shippingOrigin: String(payload.shippingOrigin || payload.origin || 'CJ · China').trim(),
+    shippingDestination: String(payload.shippingDestination || payload.destination || (siteId === 'dosalga-usa' ? 'USA' : 'México')).trim(),
+    transportMethod: String(payload.transportMethod || 'CJPacket').trim(),
+    minDeliveryDays: Number(payload.minDeliveryDays) || 7,
+    maxDeliveryDays: Number(payload.maxDeliveryDays) || 14,
     platformFeeRate: Number(payload.platformFeeRate) || 0,
     taxRate: Number(payload.taxRate) || 0,
     status: payload.status || 'review',
+    archived: Boolean(payload.archived),
+    lastCjSyncAt: payload.lastCjSyncAt || null,
+    cjChangeReport: Array.isArray(payload.cjChangeReport) ? payload.cjChangeReport : [],
     notes: String(payload.notes || ''),
     updatedAt: now,
     createdAt: payload.createdAt || now,
@@ -66,6 +82,25 @@ export default async function handler(req, res) {
       ...products[index],
       ...incoming,
       createdAt: products[index].createdAt,
+    };
+    await writeProducts(products);
+    return res.status(200).json({ product: products[index] });
+  }
+
+  if (req.method === 'DELETE') {
+    const products = await readProducts();
+    const { id } = req.query;
+    const index = products.findIndex((product) => product.id === id);
+
+    if (index === -1) {
+      return res.status(404).json({ message: 'Product not found' });
+    }
+
+    products[index] = {
+      ...products[index],
+      archived: true,
+      status: 'archived',
+      updatedAt: new Date().toISOString(),
     };
     await writeProducts(products);
     return res.status(200).json({ product: products[index] });
