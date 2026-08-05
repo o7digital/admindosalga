@@ -115,6 +115,9 @@ td small { margin-top: 5px; color: #96989d; font-size: 8px; white-space: nowrap;
 .product-cell strong { font-size: 10px; color: #24262a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 175px; }
 .product-cell span { display: block; color: #8d8f94; margin-top: 3px; font-size: 8px; white-space: nowrap; }
 .product-visual { flex: 0 0 42px; height: 49px; position: relative; overflow: hidden; background: #eeece8; }
+.product-photo { flex: 0 0 42px; width: 42px; height: 49px; object-fit: cover; background: #eeece8; }
+.product-cell a { color: inherit; text-decoration: none; }
+.product-cell a:hover { color: var(--red); }
 .product-visual::before, .product-visual::after, .product-visual span { content: ""; position: absolute; display: block; }
 .product-visual.set { background: linear-gradient(145deg,#f1e5dd,#d0b4a3); }
 .product-visual.set::before { width: 14px; height: 29px; background: #684238; left: 7px; top: 9px; border-radius: 7px 7px 2px 2px; transform: rotate(4deg); }

@@ -14,12 +14,17 @@ const blankProduct = {
   pid: '',
   brand: 'Dosalga',
   category: 'Activewear',
+  imageUrl: '',
+  productUrl: '',
   cjCost: 0,
+  cjCostUsd: 0,
   cjCostCurrency: 'USD',
   salePrice: 0,
   saleCurrency: 'USD',
+  exchangeRate: 17.49,
   shippingIncluded: true,
   shippingCost: 0,
+  shippingUsd: 0,
   shippingCurrency: 'USD',
   shippingOrigin: 'CJ · China',
   shippingDestination: 'USA',
@@ -64,7 +69,12 @@ function normalizeProduct(product) {
     stores: product.stores || [siteId],
     brand: product.brand || product.supplier || 'Dosalga',
     category: product.category || 'General',
+    imageUrl: product.imageUrl || '',
+    productUrl: product.productUrl || product.cjProductUrl || '',
     cjSku: product.cjSku || product.sku,
+    cjCostUsd: Number(product.cjCostUsd ?? product.cjCost) || 0,
+    shippingUsd: Number(product.shippingUsd ?? product.shippingCost) || 0,
+    exchangeRate: Number(product.exchangeRate) || 17.49,
     stock: Number(product.stock ?? product.quantityPlanned) || 0,
     saleCurrency: product.saleCurrency || (siteId === 'dosalga-usa' ? 'USD' : 'MXN'),
     cjCostCurrency: product.cjCostCurrency || product.saleCurrency || 'MXN',
@@ -82,7 +92,8 @@ function marketFor(product) {
   return product.siteId === 'dosalga-usa' ? 'USA' : 'México';
 }
 
-function ProductVisual({ category = '' }) {
+function ProductVisual({ category = '', imageUrl = '' }) {
+  if (imageUrl) return <img className="product-photo" src={imageUrl} alt="" />;
   const key = ['Women', 'Activewear'].includes(category) ? 'set' : category === 'Accessories' ? 'bag' : category === 'Outerwear' ? 'jacket' : 'tee';
   return <div className={`product-visual ${key}`}><span /></div>;
 }
@@ -204,9 +215,11 @@ export default function ProductControl() {
       cjSku: result.product.cjSku,
       pid: result.product.pid,
       cjCost: result.product.cjCost,
+      cjCostUsd: result.product.cjCost,
       cjCostCurrency: result.product.currency,
       saleCurrency: result.product.currency,
       shippingCost: route.shippingCost || 0,
+      shippingUsd: route.shippingCost || 0,
       shippingCurrency: result.product.currency,
       shippingOrigin: route.origin || current.shippingOrigin,
       shippingDestination: route.destination || current.shippingDestination,
@@ -250,10 +263,10 @@ export default function ProductControl() {
 
   const exportCsv = () => {
     const rows = [
-      ['Product', 'SKU Dosalga', 'SKU/PID CJ', 'Brand', 'Category', 'Store', 'Currency', 'CJ cost', 'Sale price', 'Shipping included', 'Shipping cost', 'Origin', 'Destination', 'Method', 'ETA min', 'ETA max', 'Stock', 'Status', 'Net margin', 'Margin percent', 'Last CJ sync'],
+      ['Product', 'Product URL', 'Image', 'SKU Dosalga', 'SKU/PID CJ', 'Brand', 'Category', 'Store', 'Currency', 'CJ cost USD', 'Sale price', 'Shipping included', 'Shipping USD', 'Exchange rate', 'Origin', 'Destination', 'Method', 'ETA min', 'ETA max', 'Stock', 'Status', 'Net margin', 'Margin percent', 'Last CJ sync'],
       ...filtered.map((product) => {
         const margin = calculateProductMargin(product);
-        return [product.name, product.sku, product.cjSku || product.pid, product.brand, product.category, marketFor(product), margin.saleCurrency, product.cjCost, product.salePrice, product.shippingIncluded ? 'yes' : 'no', product.shippingCost, product.shippingOrigin, product.shippingDestination, product.transportMethod, product.minDeliveryDays, product.maxDeliveryDays, product.stock, product.status, margin.profit.toFixed(2), formatPercent(margin.marginRate), product.lastCjSyncAt || ''];
+        return [product.name, product.productUrl, product.imageUrl, product.sku, product.cjSku || product.pid, product.brand, product.category, marketFor(product), margin.saleCurrency, product.cjCostUsd, product.salePrice, product.shippingIncluded ? 'yes' : 'no', product.shippingUsd, product.exchangeRate, product.shippingOrigin, product.shippingDestination, product.transportMethod, product.minDeliveryDays, product.maxDeliveryDays, product.stock, product.status, margin.profit.toFixed(2), formatPercent(margin.marginRate), product.lastCjSyncAt || ''];
       }),
     ];
     const csv = rows.map((row) => row.map((cell) => `"${String(cell ?? '').replaceAll('"', '""')}"`).join(',')).join('\n');
@@ -325,18 +338,18 @@ export default function ProductControl() {
               </div>
               <div className="table-wrap">
                 <table>
-                  <thead><tr><th className="product-col">Product / brand</th><th>Store</th><th>Currency</th><th>CJ cost</th><th>Sale price</th><th>Shipping</th><th>Route & ETA</th><th>Stock</th><th>Margin</th><th>Sync</th><th /></tr></thead>
+                  <thead><tr><th className="product-col">Product / brand</th><th>Store</th><th>Currency</th><th>CJ cost USD</th><th>Sale price</th><th>Shipping USD</th><th>Route & ETA</th><th>Stock</th><th>Margin</th><th>Sync</th><th /></tr></thead>
                   <tbody>{pageProducts.map((product) => {
                     const margin = calculateProductMargin(product);
                     const percent = Math.round(margin.marginRate * 100);
                     return (
                       <tr key={product.id}>
-                        <td><div className="product-cell"><ProductVisual category={product.category} /><div><strong>{product.name}</strong><span>{product.brand} · {product.sku}</span><small className={`status ${product.status === 'paused' || product.status === 'review' ? 'review' : product.stock <= 10 ? 'low-stock' : ''}`}>{product.status}</small></div></div></td>
+                        <td><div className="product-cell"><ProductVisual category={product.category} imageUrl={product.imageUrl} /><div><strong>{product.productUrl ? <a href={product.productUrl} target="_blank" rel="noreferrer">{product.name}</a> : product.name}</strong><span>{product.brand} · {product.sku}</span><small className={`status ${product.status === 'paused' || product.status === 'review' ? 'review' : product.stock <= 10 ? 'low-stock' : ''}`}>{product.status}</small></div></div></td>
                         <td><span className={`market-badge ${marketFor(product) === 'USA' ? 'usa' : 'mexico'}`}>{marketFor(product) !== 'Both' && <span className={`flag ${marketFor(product) === 'USA' ? 'us' : 'mx'}`} />}{marketFor(product)}</span></td>
                         <td><span className="currency-pill">{product.saleCurrency}</span></td>
-                        <td className="number"><strong>{formatCurrency(product.cjCost, product.cjCostCurrency)}</strong><small>{product.cjSku || product.pid}</small></td>
+                        <td className="number"><strong>{formatCurrency(product.cjCostUsd, 'USD')}</strong><small>{product.cjSku || product.pid}</small></td>
                         <td className="number"><strong>{formatCurrency(product.salePrice, product.saleCurrency)}</strong><small>Store price</small></td>
-                        <td><strong>{formatCurrency(product.shippingCost, product.shippingCurrency)}</strong><small className={product.shippingIncluded ? 'included' : 'separate'}>{product.shippingIncluded ? '● Included' : '○ Charged apart'}</small></td>
+                        <td><strong>{formatCurrency(product.shippingUsd, 'USD')}</strong><small className={product.shippingIncluded ? 'included' : 'separate'}>{product.shippingIncluded ? `● Included · FX ${product.exchangeRate}` : '○ Charged apart'}</small></td>
                         <td><strong className="route">{product.shippingOrigin} <span>→</span> {product.shippingDestination}</strong><small>{product.transportMethod} · {product.minDeliveryDays}-{product.maxDeliveryDays} days</small></td>
                         <td><strong className={product.stock <= 10 ? 'danger-text' : ''}>{product.stock}</strong><small>{product.stock <= 10 ? 'Low stock' : 'Available'}</small></td>
                         <td><div className={`margin-ring ${percent < 35 ? 'warning' : ''}`} style={{ '--margin': `${Math.max(0, Math.min(100, percent)) * 3.6}deg` }}><span>{percent}%</span></div><small>{formatCurrency(margin.profit, margin.saleCurrency)}</small></td>

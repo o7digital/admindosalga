@@ -20,6 +20,8 @@ const asNumber = (value) => {
   return Number.isFinite(numeric) ? numeric : 0;
 };
 
+const exchangeRate = Number(process.env.USD_MXN_RATE) || 17.49;
+
 const getMeta = (product, key) => {
   const meta = product.meta_data?.find((item) => item.key === key);
   return meta?.value;
@@ -51,6 +53,9 @@ const mapWooProduct = (product, source) => {
   const category = product.categories?.[0]?.name || 'General';
   const stock = product.stock_quantity ?? (product.stock_status === 'instock' ? 25 : 0);
   const salePrice = asNumber(product.price || product.sale_price || product.regular_price);
+  const imageUrl = product.images?.[0]?.thumbnail || product.images?.[0]?.src || '';
+  const cjCostUsd = asNumber(getMeta(product, 'cj_cost_usd') || getMeta(product, '_cj_cost_usd') || getMeta(product, 'cj_cost') || getMeta(product, '_cj_cost'));
+  const shippingUsd = asNumber(getMeta(product, 'shipping_usd') || getMeta(product, '_shipping_usd') || getMeta(product, 'shipping_cost') || getMeta(product, '_shipping_cost'));
   const now = new Date().toISOString();
 
   return {
@@ -63,17 +68,22 @@ const mapWooProduct = (product, source) => {
     name: String(product.name || 'Untitled product').trim(),
     brand: String(getMeta(product, 'brand') || 'Dosalga').trim(),
     category,
+    imageUrl,
+    productUrl: product.permalink || '',
     supplier: 'WooCommerce',
     cjProductUrl: product.permalink || '',
     quantityPlanned: asNumber(stock),
     stock: asNumber(stock),
-    cjCost: asNumber(getMeta(product, 'cj_cost') || getMeta(product, '_cj_cost') || 0),
-    cjCostCurrency: source.currency,
+    cjCost: cjCostUsd,
+    cjCostUsd,
+    cjCostCurrency: 'USD',
     salePrice,
     saleCurrency: source.currency,
+    exchangeRate,
     shippingIncluded: true,
-    shippingCost: asNumber(getMeta(product, 'shipping_cost') || getMeta(product, '_shipping_cost') || 0),
-    shippingCurrency: source.currency,
+    shippingCost: shippingUsd,
+    shippingUsd,
+    shippingCurrency: 'USD',
     shippingOrigin: String(getMeta(product, 'shipping_origin') || 'WordPress · WooCommerce').trim(),
     shippingDestination: source.destination,
     transportMethod: String(getMeta(product, 'shipping_method') || 'Store shipping').trim(),
