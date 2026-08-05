@@ -2,14 +2,14 @@ const storeSources = [
   {
     id: 'dosalga-mexico',
     name: 'Dosalga México',
-    url: process.env.DOSALGA_MEXICO_APP_URL || process.env.DOSALGA_MX_APP_URL || 'https://www.dosalga.online',
+    url: process.env.DOSALGA_MEXICO_WP_URL || 'https://oliviers44.sg-host.com',
     currency: 'MXN',
     destination: 'México',
   },
   {
     id: 'dosalga-usa',
     name: 'Dosalga USA',
-    url: process.env.DOSALGA_USA_APP_URL || process.env.DOSALGA_US_APP_URL || 'https://www.dosalga.store',
+    url: process.env.DOSALGA_USA_WP_URL || 'https://oliviers55.sg-host.com',
     currency: 'USD',
     destination: 'USA',
   },
@@ -28,32 +28,39 @@ const getMeta = (product, key) => {
 };
 
 const fetchStoreProducts = async (source) => {
-  const url = new URL('/api/products', source.url);
-  url.searchParams.set('all', 'true');
-  url.searchParams.set('limit', '100');
-  url.searchParams.set('lang', source.id === 'dosalga-mexico' ? 'es' : 'en');
+  const products = [];
 
-  const response = await fetch(url.toString(), {
-    headers: { Accept: 'application/json' },
-  });
+  for (let page = 1; page <= 10; page += 1) {
+    const url = new URL('/wp-json/wc/store/v1/products', source.url);
+    url.searchParams.set('per_page', '100');
+    url.searchParams.set('page', String(page));
 
-  if (!response.ok) {
-    throw new Error(`${source.name} returned ${response.status}`);
+    const response = await fetch(url.toString(), {
+      headers: { Accept: 'application/json' },
+    });
+
+    if (!response.ok) {
+      throw new Error(`${source.name} returned ${response.status}`);
+    }
+
+    const pageProducts = await response.json();
+    if (!Array.isArray(pageProducts) || pageProducts.length === 0) break;
+    products.push(...pageProducts);
+    if (pageProducts.length < 100) break;
   }
 
-  const payload = await response.json();
-  if (!payload.success || !Array.isArray(payload.data)) {
-    throw new Error(`${source.name} returned an unexpected product payload`);
-  }
-
-  return payload.data;
+  return products;
 };
 
 const mapWooProduct = (product, source) => {
   const category = product.categories?.[0]?.name || 'General';
   const stock = product.stock_quantity ?? (product.stock_status === 'instock' ? 25 : 0);
-  const salePrice = asNumber(product.price || product.sale_price || product.regular_price);
-  const imageUrl = product.images?.[0]?.thumbnail || product.images?.[0]?.src || '';
+  const rawPrice = asNumber(product.prices?.price || product.price || product.sale_price || product.regular_price);
+  const minorUnit = Number(product.prices?.currency_minor_unit ?? 2);
+  const storePrice = rawPrice / (10 ** minorUnit);
+  const salePrice = Number((source.id === 'dosalga-usa' ? storePrice / exchangeRate : storePrice).toFixed(2));
+  const image = Array.isArray(product.images) ? product.images[0] : product.images;
+  const imageUrl = image?.thumbnail || image?.src || '';
   const cjCostUsd = asNumber(getMeta(product, 'cj_cost_usd') || getMeta(product, '_cj_cost_usd') || getMeta(product, 'cj_cost') || getMeta(product, '_cj_cost'));
   const shippingUsd = asNumber(getMeta(product, 'shipping_usd') || getMeta(product, '_shipping_usd') || getMeta(product, 'shipping_cost') || getMeta(product, '_shipping_cost'));
   const now = new Date().toISOString();
@@ -69,7 +76,7 @@ const mapWooProduct = (product, source) => {
     brand: String(getMeta(product, 'brand') || 'Dosalga').trim(),
     category,
     imageUrl,
-    productUrl: product.permalink || '',
+    productUrl: product.permalink || product.add_to_cart?.url || '',
     supplier: 'WooCommerce',
     cjProductUrl: product.permalink || '',
     quantityPlanned: asNumber(stock),
