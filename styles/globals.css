@@ -169,6 +169,26 @@ button.insight-row:hover { color: var(--red-dark); }
 .insight-row strong { flex: 0 0 auto; color: #25272b; font-size: 10px; }
 .big-number { font-size: 40px; font-weight: 650; letter-spacing: 0; color: #17181b; }
 
+.mockup-board { margin-top: 14px; display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 11px; }
+.mockup-panel { background: white; border: 1px solid var(--line); padding: 18px; min-height: 218px; }
+.mockup-panel h2 { margin: 0 0 14px; font-size: 14px; letter-spacing: 0; }
+.mockup-panel p { margin: 8px 0 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
+.kanban-row { min-height: 48px; border-top: 1px solid #efede9; display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 12px; font-size: 10px; }
+.kanban-row span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #393b40; }
+.kanban-row strong { color: #17181b; white-space: nowrap; }
+.kanban-row em { font-style: normal; color: var(--red-dark); background: #fff0f0; padding: 4px 7px; border-radius: 20px; font-size: 8px; font-weight: 800; }
+.report-action { margin-top: 14px; }
+.ai-report { margin-top: 16px; border-top: 1px solid #efede9; padding-top: 14px; }
+.ai-report > strong { display: block; font-size: 13px; color: #17181b; }
+.ai-report .kanban-row { grid-template-columns: 1fr auto; }
+.bi-metric-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; }
+.bi-metric-row div { border: 1px solid #efede9; padding: 12px; background: #fbfbfa; }
+.bi-metric-row span, .bi-bars span { display: block; color: #777a80; font-size: 9px; font-weight: 700; }
+.bi-metric-row strong { display: block; margin-top: 7px; color: #17181b; font-size: 19px; }
+.bi-bars { margin-top: 16px; display: grid; gap: 10px; }
+.bi-bars div { display: grid; gap: 5px; }
+.bi-bars i { display: block; height: 6px; background: var(--red); min-width: 8px; }
+
 .modal-backdrop { position: fixed; inset: 0; background: rgba(12,13,15,.55); z-index: 50; display: grid; place-items: center; padding: 20px; backdrop-filter: blur(3px); }
 .modal { width: min(720px, 100%); max-height: calc(100vh - 40px); overflow: hidden; background: white; box-shadow: 0 28px 90px rgba(0,0,0,.24); animation: modalIn .25s ease-out; }
 @keyframes modalIn { from { opacity: 0; transform: translateY(12px) scale(.985); } }
@@ -201,6 +221,8 @@ button.insight-row:hover { color: var(--red-dark); }
   .workspace { margin-left: 196px; width: calc(100% - 196px); }
   .metrics { grid-template-columns: 1fr 1fr; }
   .insight-grid { grid-template-columns: 1fr 1fr; }
+  .mockup-board { grid-template-columns: 1fr 1fr; }
+  .mockup-panel.wide { grid-column: 1 / -1; }
   .brand-lockup img { width: 140px; }
 }
 
@@ -221,6 +243,9 @@ button.insight-row:hover { color: var(--red-dark); }
   .title-actions .btn { flex: 1; }
   .metrics { grid-template-columns: 1fr 1fr; gap: 8px; }
   .insight-grid { grid-template-columns: 1fr; }
+  .mockup-board { grid-template-columns: 1fr; }
+  .mockup-panel.wide { grid-column: auto; }
+  .bi-metric-row { grid-template-columns: 1fr; }
   .metrics article { min-height: 108px; padding: 14px; }
   .metric-line strong { font-size: 21px; }
   .catalog-head { overflow-x: auto; gap: 15px; }

@@ -111,6 +111,8 @@ export default function ProductControl() {
   const [editingProduct, setEditingProduct] = useState(blankProduct);
   const [syncing, setSyncing] = useState(false);
   const [importingWp, setImportingWp] = useState(false);
+  const [oliviaLoading, setOliviaLoading] = useState(false);
+  const [oliviaReport, setOliviaReport] = useState(null);
   const [toast, setToast] = useState('');
   const [error, setError] = useState('');
 
@@ -321,6 +323,20 @@ export default function ProductControl() {
     URL.revokeObjectURL(url);
   };
 
+  const runOliviaOne = async () => {
+    setOliviaLoading(true);
+    setError('');
+    const response = await fetch('/api/ai/olivia-one', { method: 'POST' });
+    const result = await response.json();
+    setOliviaLoading(false);
+    if (!response.ok) {
+      setError(result.message || 'Olivia One analysis failed.');
+      return;
+    }
+    setOliviaReport(result);
+    notify(`Olivia One analysis ready · ${result.mode}`);
+  };
+
   return (
     <>
       <Head>
@@ -344,6 +360,17 @@ export default function ProductControl() {
             ))}
             <p className="nav-label second">Connections</p>
             <button className={`nav-item cj ${activeView === 'CJ Connection' ? 'active' : ''}`} onClick={() => setActiveView('CJ Connection')}><span className="cj-mark">CJ</span> CJdropshipping <span className="connected-dot" /></button>
+            <p className="nav-label second">Growth</p>
+            {[
+              ['Sponsors', 'grid'],
+              ['Socios', 'box'],
+              ['Reporting IA', 'chart'],
+              ['Reporting & Analytics BI', 'chart'],
+            ].map(([label, icon]) => (
+              <button key={label} className={`nav-item ${activeView === label ? 'active' : ''}`} onClick={() => setActiveView(label)}>
+                <Icon name={icon} /> {label}
+              </button>
+            ))}
           </nav>
           <div className="sidebar-note"><div className="note-top"><span>CJ connection</span><span className="online">● Demo</span></div><strong>2 stores synchronized</strong><p>Last update · {new Date().toLocaleDateString('en-US')}</p></div>
           <div className="profile"><div className="avatar">OS</div><div><strong>Olivier</strong><span>Administrator</span></div><Icon name="dots" /></div>
@@ -402,6 +429,38 @@ export default function ProductControl() {
               <section className="insight-grid">
                 <article><h2>Connection state</h2><div className="big-number">Demo</div><p>Live CJ credentials are not configured in this app yet.</p><button className="btn primary" onClick={syncCj} disabled={syncing}><Icon name="refresh" /> {syncing ? 'Syncing...' : 'Run CJ sync'}</button></article>
                 <article><h2>Product linking</h2><div className="insight-row"><span>Linked to CJ</span><strong>{cjSummary.linked}</strong></div><div className="insight-row"><span>Unlinked</span><strong>{cjSummary.unlinked}</strong></div><div className="insight-row"><span>Synced at least once</span><strong>{cjSummary.synced}</strong></div><div className="insight-row"><span>Open changes</span><strong>{cjSummary.changes}</strong></div></article>
+              </section>
+            )}
+
+            {activeView === 'Sponsors' && (
+              <section className="mockup-board">
+                <article className="mockup-panel wide"><h2>Campaign pipeline</h2><div className="kanban-row"><span>Homepage banner</span><strong>$1,200 USD</strong><em>Booked</em></div><div className="kanban-row"><span>Product page placement</span><strong>$750 USD</strong><em>Draft</em></div><div className="kanban-row"><span>Collection takeover</span><strong>$2,400 USD</strong><em>Review</em></div></article>
+                <article className="mockup-panel"><h2>Inventory</h2><div className="big-number">8</div><p>Available sponsor placements across USA and México stores.</p></article>
+                <article className="mockup-panel"><h2>Fields</h2><p>Sponsor, campaign, store, placement, dates, budget, creative, target link, status.</p></article>
+              </section>
+            )}
+
+            {activeView === 'Socios' && (
+              <section className="mockup-board">
+                <article className="mockup-panel wide"><h2>Socio workspaces</h2><div className="kanban-row"><span>Fitness Partner MX</span><strong>34 products</strong><em>Active</em></div><div className="kanban-row"><span>Wellness USA Retail</span><strong>18 products</strong><em>Setup</em></div><div className="kanban-row"><span>Creator Store Pilot</span><strong>12 products</strong><em>Limited</em></div></article>
+                <article className="mockup-panel"><h2>Model</h2><p>Socio, assigned products, commission, orders generated, branding and restricted access.</p></article>
+                <article className="mockup-panel"><h2>Revenue</h2><div className="big-number">12%</div><p>Default Dosalga management fee placeholder.</p></article>
+              </section>
+            )}
+
+            {activeView === 'Reporting IA' && (
+              <section className="mockup-board">
+                <article className="mockup-panel wide"><h2>Olivia One</h2><p>AI analyst for the full Dosalga dashboard: products, margins, shipping, CJ connection, sponsors, socios and reporting readiness.</p><button className="btn primary report-action" onClick={runOliviaOne} disabled={oliviaLoading}><Icon name="refresh" /> {oliviaLoading ? 'Analyzing...' : 'Run Olivia One'}</button>{oliviaReport && <div className="ai-report"><strong>{oliviaReport.analysis.title}</strong><p>{oliviaReport.analysis.executiveSummary}</p>{oliviaReport.analysis.priorities?.map((item) => <div key={item} className="kanban-row"><span>{item}</span><em>Priority</em></div>)}</div>}</article>
+                <article className="mockup-panel"><h2>AI queue</h2><div className="kanban-row"><span>Products to push in ads</span><strong>{marginSummary.best.length}</strong><em>Ready</em></div><div className="kanban-row"><span>Low margin warnings</span><strong>{marginSummary.low.length}</strong><em>Review</em></div><div className="kanban-row"><span>Shipping risk alerts</span><strong>{routeSummary.reduce((sum, route) => sum + route.alerts, 0)}</strong><em>Open</em></div></article>
+                <article className="mockup-panel"><h2>Recommendations</h2>{oliviaReport ? oliviaReport.analysis.recommendations?.map((item) => <p key={item}>{item}</p>) : <p>Run Olivia One to generate operational recommendations from the current dashboard data.</p>}</article>
+              </section>
+            )}
+
+            {activeView === 'Reporting & Analytics BI' && (
+              <section className="mockup-board">
+                <article className="mockup-panel wide"><h2>BI command center</h2><div className="bi-metric-row"><div><span>Net margin monitor</span><strong>{formatPercent(metrics.averageMargin)}</strong></div><div><span>Products analyzed</span><strong>{metrics.active}</strong></div><div><span>Shipping alerts</span><strong>{routeSummary.reduce((sum, route) => sum + route.alerts, 0)}</strong></div></div><div className="bi-bars">{marginSummary.best.map(({ product, margin }) => <div key={product.id}><span>{product.name}</span><i style={{ width: `${Math.max(8, Math.min(100, margin.marginRate * 100))}%` }} /></div>)}</div></article>
+                <article className="mockup-panel"><h2>Dashboards</h2><div className="kanban-row"><span>Sales by store</span><em>Planned</em></div><div className="kanban-row"><span>Margin snapshots</span><em>Planned</em></div><div className="kanban-row"><span>Best sellers</span><em>Planned</em></div><div className="kanban-row"><span>Sponsor ROI</span><em>Planned</em></div></article>
+                <article className="mockup-panel"><h2>Exports</h2><p>CSV and BI-ready datasets for products, orders, margins, stock, shipping, sponsors and socios once Postgres is connected.</p><button className="btn secondary report-action" onClick={exportCsv}><Icon name="upload" /> Export products CSV</button></article>
               </section>
             )}
 
