@@ -100,6 +100,7 @@ function ProductVisual({ category = '', imageUrl = '' }) {
 
 export default function ProductControl() {
   const [products, setProducts] = useState([]);
+  const [activeView, setActiveView] = useState('Products');
   const [market, setMarket] = useState('All');
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('All categories');
@@ -147,6 +148,48 @@ export default function ProductControl() {
     const averageMargin = margins.length ? margins.reduce((sum, value) => sum + value, 0) / margins.length : 0;
     const attention = active.filter((product) => product.stock <= 10 || product.cjChangeReport?.length || calculateProductMargin(product).marginRate < 0.25).length;
     return { active: active.length, included, averageMargin, attention };
+  }, [filtered]);
+
+  const routeSummary = useMemo(() => {
+    const routes = new Map();
+    filtered.forEach((product) => {
+      const key = `${product.shippingOrigin}|${product.shippingDestination}|${product.transportMethod}`;
+      const current = routes.get(key) || {
+        origin: product.shippingOrigin,
+        destination: product.shippingDestination,
+        method: product.transportMethod,
+        products: 0,
+        cost: 0,
+        minDays: product.minDeliveryDays,
+        maxDays: product.maxDeliveryDays,
+        alerts: 0,
+      };
+      current.products += 1;
+      current.cost += Number(product.shippingUsd) || 0;
+      current.minDays = Math.min(current.minDays, product.minDeliveryDays || current.minDays);
+      current.maxDays = Math.max(current.maxDays, product.maxDeliveryDays || current.maxDays);
+      current.alerts += Number(product.shippingUsd) > 12 || Number(product.maxDeliveryDays) > 18 ? 1 : 0;
+      routes.set(key, current);
+    });
+    return [...routes.values()].map((route) => ({ ...route, averageCost: route.products ? route.cost / route.products : 0 }));
+  }, [filtered]);
+
+  const marginSummary = useMemo(() => {
+    const enriched = filtered
+      .map((product) => ({ product, margin: calculateProductMargin(product) }))
+      .sort((a, b) => a.margin.marginRate - b.margin.marginRate);
+    return {
+      low: enriched.filter((item) => item.margin.marginRate < 0.25),
+      negative: enriched.filter((item) => item.margin.profit < 0),
+      best: [...enriched].reverse().slice(0, 5),
+    };
+  }, [filtered]);
+
+  const cjSummary = useMemo(() => {
+    const linked = filtered.filter((product) => product.pid || product.cjSku).length;
+    const synced = filtered.filter((product) => product.lastCjSyncAt).length;
+    const changes = filtered.reduce((sum, product) => sum + (product.cjChangeReport?.length || 0), 0);
+    return { linked, synced, changes, unlinked: filtered.length - linked };
   }, [filtered]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
@@ -289,12 +332,18 @@ export default function ProductControl() {
           <div className="brand-lockup"><img src={logoUrl} alt="Dosalga" /><span>Product Control</span></div>
           <nav aria-label="Main navigation">
             <p className="nav-label">Workspace</p>
-            <button className="nav-item"><Icon name="grid" /> Overview</button>
-            <button className="nav-item active"><Icon name="box" /> Products <span className="nav-count">{products.length}</span></button>
-            <button className="nav-item"><Icon name="truck" /> Shipping</button>
-            <button className="nav-item"><Icon name="chart" /> Margins</button>
+            {[
+              ['Overview', 'grid'],
+              ['Products', 'box'],
+              ['Shipping', 'truck'],
+              ['Margins', 'chart'],
+            ].map(([label, icon]) => (
+              <button key={label} className={`nav-item ${activeView === label ? 'active' : ''}`} onClick={() => setActiveView(label)}>
+                <Icon name={icon} /> {label} {label === 'Products' && <span className="nav-count">{products.length}</span>}
+              </button>
+            ))}
             <p className="nav-label second">Connections</p>
-            <button className="nav-item cj"><span className="cj-mark">CJ</span> CJdropshipping <span className="connected-dot" /></button>
+            <button className={`nav-item cj ${activeView === 'CJ Connection' ? 'active' : ''}`} onClick={() => setActiveView('CJ Connection')}><span className="cj-mark">CJ</span> CJdropshipping <span className="connected-dot" /></button>
           </nav>
           <div className="sidebar-note"><div className="note-top"><span>CJ connection</span><span className="online">● Demo</span></div><strong>2 stores synchronized</strong><p>Last update · {new Date().toLocaleDateString('en-US')}</p></div>
           <div className="profile"><div className="avatar">OS</div><div><strong>Olivier</strong><span>Administrator</span></div><Icon name="dots" /></div>
@@ -316,7 +365,7 @@ export default function ProductControl() {
           <div className="content">
             {error && <div className="error-banner">{error}</div>}
             <div className="title-row">
-              <div><div className="eyebrow"><span /> DOSALGA COMMERCE</div><h1>Product inventory</h1><p>One catalogue. Two markets. Every cost and margin under control.</p></div>
+              <div><div className="eyebrow"><span /> DOSALGA COMMERCE</div><h1>{activeView === 'Products' ? 'Product inventory' : activeView}</h1><p>One catalogue. Two markets. Every cost and margin under control.</p></div>
               <div className="title-actions"><button className="btn secondary" onClick={importWordPress} disabled={importingWp}><Icon name="upload" />{importingWp ? 'Importing...' : 'Import WP'}</button><button className="btn secondary" onClick={syncCj} disabled={syncing}><span className={syncing ? 'spin' : ''}><Icon name="refresh" /></span>{syncing ? 'Syncing...' : 'Sync CJ'}</button><button className="btn primary" onClick={openNewProduct}><Icon name="plus" /> Add product</button></div>
             </div>
 
@@ -327,7 +376,36 @@ export default function ProductControl() {
               <article className="attention-card"><span>Needs attention</span><div className="metric-line"><strong>{metrics.attention}</strong><em>Review</em></div><small>Low stock, margin or CJ changes</small></article>
             </div>
 
-            <section className="catalog-card">
+            {activeView === 'Overview' && (
+              <section className="insight-grid">
+                <article><h2>Priority queue</h2>{filtered.filter((product) => product.stock <= 10 || calculateProductMargin(product).marginRate < 0.25).slice(0, 6).map((product) => <button key={product.id} className="insight-row" onClick={() => openEditProduct(product)}><span>{product.name}</span><strong>{product.stock <= 10 ? `${product.stock} stock` : formatPercent(calculateProductMargin(product).marginRate)}</strong></button>)}</article>
+                <article><h2>Store coverage</h2>{['USA', 'México', 'Both'].map((store) => <div key={store} className="insight-row"><span>{store}</span><strong>{filtered.filter((product) => marketFor(product) === store).length}</strong></div>)}</article>
+              </section>
+            )}
+
+            {activeView === 'Shipping' && (
+              <section className="catalog-card compact-card">
+                <div className="catalog-head"><div className="tabs"><button className="tab active">Routes <span>{routeSummary.length}</span></button></div></div>
+                <div className="table-wrap"><table><thead><tr><th>Route</th><th>Method</th><th>Products</th><th>Avg shipping USD</th><th>ETA</th><th>Alerts</th></tr></thead><tbody>{routeSummary.map((route) => <tr key={`${route.origin}-${route.destination}-${route.method}`}><td><strong>{route.origin} to {route.destination}</strong></td><td>{route.method}</td><td>{route.products}</td><td>{formatCurrency(route.averageCost, 'USD')}</td><td>{route.minDays}-{route.maxDays} days</td><td className={route.alerts ? 'danger-text' : ''}>{route.alerts || 'Clear'}</td></tr>)}</tbody></table></div>
+              </section>
+            )}
+
+            {activeView === 'Margins' && (
+              <section className="insight-grid">
+                <article><h2>Low margin</h2>{marginSummary.low.slice(0, 8).map(({ product, margin }) => <button key={product.id} className="insight-row" onClick={() => openEditProduct(product)}><span>{product.name}</span><strong>{formatPercent(margin.marginRate)}</strong></button>)}</article>
+                <article><h2>Best margin</h2>{marginSummary.best.map(({ product, margin }) => <button key={product.id} className="insight-row" onClick={() => openEditProduct(product)}><span>{product.name}</span><strong>{formatCurrency(margin.profit, margin.saleCurrency)}</strong></button>)}</article>
+                <article><h2>Negative margin</h2><div className="big-number">{marginSummary.negative.length}</div><p>Products selling below landed cost in the current filters.</p></article>
+              </section>
+            )}
+
+            {activeView === 'CJ Connection' && (
+              <section className="insight-grid">
+                <article><h2>Connection state</h2><div className="big-number">Demo</div><p>Live CJ credentials are not configured in this app yet.</p><button className="btn primary" onClick={syncCj} disabled={syncing}><Icon name="refresh" /> {syncing ? 'Syncing...' : 'Run CJ sync'}</button></article>
+                <article><h2>Product linking</h2><div className="insight-row"><span>Linked to CJ</span><strong>{cjSummary.linked}</strong></div><div className="insight-row"><span>Unlinked</span><strong>{cjSummary.unlinked}</strong></div><div className="insight-row"><span>Synced at least once</span><strong>{cjSummary.synced}</strong></div><div className="insight-row"><span>Open changes</span><strong>{cjSummary.changes}</strong></div></article>
+              </section>
+            )}
+
+            {activeView === 'Products' && <section className="catalog-card">
               <div className="catalog-head"><div className="tabs"><button className="tab active">All products <span>{filtered.length}</span></button><button className="tab">Active <span>{filtered.filter((p) => p.status === 'approved' || p.status === 'ordered').length}</span></button><button className="tab">Needs review <span>{metrics.attention}</span></button><button className="tab">Drafts <span>{filtered.filter((p) => p.status === 'review').length}</span></button></div><button className="export" onClick={exportCsv}><Icon name="upload" /> Export CSV</button></div>
               <div className="filters">
                 <label className="search-box"><Icon name="search" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search product, SKU or brand" /></label>
@@ -361,7 +439,7 @@ export default function ProductControl() {
                 </table>
               </div>
               <footer className="table-footer"><span>Showing {pageProducts.length} of {filtered.length} products</span><div><button disabled={page === 1} onClick={() => setPage(page - 1)}>←</button>{Array.from({ length: totalPages }).slice(0, 5).map((_, index) => <button key={index + 1} className={page === index + 1 ? 'page-active' : ''} onClick={() => setPage(index + 1)}>{index + 1}</button>)}<button disabled={page === totalPages} onClick={() => setPage(page + 1)}>→</button></div></footer>
-            </section>
+            </section>}
           </div>
         </section>
 

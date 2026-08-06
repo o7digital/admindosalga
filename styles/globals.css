@@ -84,6 +84,7 @@ h1 { font-size: clamp(27px, 2.2vw, 38px); margin: 9px 0 4px; letter-spacing: 0; 
 .attention-card .metric-line em { background: #372124; color: #ff7a82; }
 
 .catalog-card { margin-top: 14px; background: white; border: 1px solid var(--line); box-shadow: 0 12px 40px rgba(24,24,24,.025); }
+.compact-card table { min-width: 760px; }
 .catalog-head { min-height: 58px; border-bottom: 1px solid var(--line); padding: 0 17px; display: flex; justify-content: space-between; align-items: center; gap: 16px; }
 .tabs { align-self: stretch; display: flex; gap: 5px; }
 .tab { position: relative; border: 0; background: transparent; color: #888a90; font-size: 10px; font-weight: 700; padding: 0 11px; }
@@ -158,6 +159,16 @@ td small { margin-top: 5px; color: #96989d; font-size: 8px; white-space: nowrap;
 .table-footer button.page-active { background: #17181b; color: white; border-color: #17181b; }
 .table-footer button:disabled { opacity: .35; cursor: default; }
 
+.insight-grid { margin-top: 14px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 11px; }
+.insight-grid article { background: white; border: 1px solid var(--line); padding: 18px; min-height: 210px; }
+.insight-grid h2 { margin: 0 0 14px; font-size: 14px; letter-spacing: 0; }
+.insight-grid p { margin: 9px 0 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
+.insight-row { width: 100%; min-height: 38px; border: 0; border-top: 1px solid #efede9; background: transparent; color: #55585e; display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 9px 0; text-align: left; font-size: 10px; }
+button.insight-row:hover { color: var(--red-dark); }
+.insight-row span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.insight-row strong { flex: 0 0 auto; color: #25272b; font-size: 10px; }
+.big-number { font-size: 40px; font-weight: 650; letter-spacing: 0; color: #17181b; }
+
 .modal-backdrop { position: fixed; inset: 0; background: rgba(12,13,15,.55); z-index: 50; display: grid; place-items: center; padding: 20px; backdrop-filter: blur(3px); }
 .modal { width: min(720px, 100%); max-height: calc(100vh - 40px); overflow: hidden; background: white; box-shadow: 0 28px 90px rgba(0,0,0,.24); animation: modalIn .25s ease-out; }
 @keyframes modalIn { from { opacity: 0; transform: translateY(12px) scale(.985); } }
@@ -189,6 +200,7 @@ td small { margin-top: 5px; color: #96989d; font-size: 8px; white-space: nowrap;
   .sidebar { width: 196px; }
   .workspace { margin-left: 196px; width: calc(100% - 196px); }
   .metrics { grid-template-columns: 1fr 1fr; }
+  .insight-grid { grid-template-columns: 1fr 1fr; }
   .brand-lockup img { width: 140px; }
 }
 
@@ -208,6 +220,7 @@ td small { margin-top: 5px; color: #96989d; font-size: 8px; white-space: nowrap;
   .title-actions { width: 100%; }
   .title-actions .btn { flex: 1; }
   .metrics { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .insight-grid { grid-template-columns: 1fr; }
   .metrics article { min-height: 108px; padding: 14px; }
   .metric-line strong { font-size: 21px; }
   .catalog-head { overflow-x: auto; gap: 15px; }
