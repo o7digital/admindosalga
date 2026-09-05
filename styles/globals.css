@@ -100,7 +100,7 @@ h1 { font-size: clamp(27px, 2.2vw, 38px); margin: 9px 0 4px; letter-spacing: 0; 
 .select-wrap svg { position: absolute; right: 9px; pointer-events: none; }
 .result-count { margin-left: auto; color: #a0a2a6; font-size: 9px; }
 .table-wrap { width: 100%; overflow-x: auto; }
-table { width: 100%; border-collapse: collapse; min-width: 1240px; table-layout: auto; }
+table { width: 100%; border-collapse: collapse; min-width: 1460px; table-layout: auto; }
 thead { background: #faf9f7; }
 th { height: 39px; color: #929499; font-size: 8px; letter-spacing: .07em; text-transform: uppercase; text-align: left; padding: 0 11px; white-space: nowrap; font-weight: 700; }
 th:first-child, td:first-child { padding-left: 17px; }
@@ -111,6 +111,10 @@ tbody tr:hover { background: #fdfcfa; }
 td strong, td small { display: block; }
 td > strong, .number strong { color: #292b30; font-size: 10px; white-space: nowrap; }
 td small { margin-top: 5px; color: #96989d; font-size: 8px; white-space: nowrap; }
+.competitor-cell button { border: 1px solid #e4e1dc; background: #fff; border-radius: 7px; padding: 8px 9px; text-align: left; min-width: 108px; }
+.competitor-cell button:hover { border-color: #aaa59e; background: #faf9f7; }
+.competitor-cell button strong { color: #24262a; font-size: 9px; }
+.competitor-cell button small { margin-top: 4px; color: #8c8f94; font-size: 7px; }
 .product-cell { display: flex; align-items: center; gap: 11px; }
 .product-cell > div:last-child { min-width: 0; }
 .product-cell strong { font-size: 10px; color: #24262a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 175px; }
@@ -344,6 +348,17 @@ button.insight-row:hover { color: var(--red-dark); }
 .preview-margin strong { grid-row: span 2; font-size: 23px; }
 .preview-margin small { margin-top: 4px; color: #777a80; font-size: 8px; }
 .modal-actions { padding: 14px 22px; background: #f8f7f5; border-top: 1px solid var(--line); display: flex; justify-content: flex-end; gap: 8px; }
+.competitor-modal { width: min(580px, 100%); }
+.competitor-product { display: flex; align-items: center; gap: 12px; padding: 12px; background: #f8f7f5; border: 1px solid var(--line); }
+.competitor-product strong, .competitor-product span { display: block; }
+.competitor-product strong { font-size: 11px; }
+.competitor-product span { margin-top: 5px; color: #85888d; font-size: 9px; }
+.history-note { margin: 0; color: #85888d; font-size: 9px; line-height: 1.5; }
+.auth-page { min-height: 100vh; display: grid; place-content: center; justify-items: center; gap: 24px; padding: 30px; background: #121316; }
+.auth-page > img { width: 190px; height: auto; }
+.auth-setup { width: min(440px, 90vw); padding: 28px; background: white; text-align: center; }
+.auth-setup h1 { font-size: 22px; }
+.auth-setup p { color: var(--muted); font-size: 12px; line-height: 1.6; }
 .toast { position: fixed; z-index: 70; right: 24px; bottom: 24px; background: #16171a; color: white; padding: 12px 16px; box-shadow: 0 12px 40px rgba(0,0,0,.2); display: flex; align-items: center; gap: 9px; font-size: 10px; animation: toastIn .25s ease-out; }
 .toast span { width: 19px; height: 19px; display: grid; place-items: center; color: #75d6a9; background: #203c32; border-radius: 50%; }
 @keyframes toastIn { from { opacity: 0; transform: translateY(10px); } }

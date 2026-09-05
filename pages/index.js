@@ -1,5 +1,6 @@
 import Head from 'next/head';
 import { useEffect, useMemo, useState } from 'react';
+import { UserButton } from '@clerk/nextjs';
 import { calculateProductMargin, formatCurrency, formatPercent } from '@/lib/margins';
 
 const logoUrl = 'https://www.dosalga.store/logo-dosalga.png';
@@ -260,6 +261,9 @@ export default function ProductControl() {
   const [oliviaReport, setOliviaReport] = useState(null);
   const [toast, setToast] = useState('');
   const [error, setError] = useState('');
+  const [competitorEditor, setCompetitorEditor] = useState(null);
+  const [savingCompetitor, setSavingCompetitor] = useState(false);
+  const clerkEnabled = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
 
   const persistProducts = (nextProducts) => {
     try {
@@ -400,6 +404,45 @@ export default function ProductControl() {
   const openEditProduct = (product) => {
     setEditingProduct(normalizeProduct(product));
     setModalOpen(true);
+  };
+
+  const openCompetitorEditor = (product, competitorName) => {
+    const current = product.competitors?.[competitorName.toLowerCase()] || {};
+    setCompetitorEditor({
+      product,
+      competitorName,
+      price: current.price ?? '',
+      shippingCost: current.shippingCost ?? 0,
+      url: current.url || '',
+    });
+  };
+
+  const saveCompetitor = async (event) => {
+    event.preventDefault();
+    setSavingCompetitor(true);
+    setError('');
+    try {
+      const response = await fetch('/api/competitors', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          productId: competitorEditor.product.id,
+          competitorName: competitorEditor.competitorName,
+          price: Number(competitorEditor.price),
+          shippingCost: Number(competitorEditor.shippingCost || 0),
+          url: competitorEditor.url,
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || 'Competitor price could not be saved.');
+      setCompetitorEditor(null);
+      await loadProducts();
+      notify(`${competitorEditor.competitorName} price saved for ${marketFor(competitorEditor.product)}`);
+    } catch (saveError) {
+      setError(saveError.message);
+    } finally {
+      setSavingCompetitor(false);
+    }
   };
 
   const saveProduct = async (event) => {
@@ -603,7 +646,7 @@ export default function ProductControl() {
             ))}
           </nav>
           <div className="sidebar-note"><div className="note-top"><span>CJ connection</span><span className={cjConnection.connected ? 'online' : ''}>● {cjStatusLabel}</span></div><strong>2 stores connected</strong><p>MX + USA backends</p></div>
-          <div className="profile"><div className="avatar">OS</div><div><strong>Olivier</strong><span>Administrator</span></div><Icon name="dots" /></div>
+          <div className="profile">{clerkEnabled ? <UserButton afterSignOutUrl="/sign-in" /> : <div className="avatar">OS</div>}<div><strong>Dosalga Admin</strong><span>{clerkEnabled ? 'Compte sécurisé' : 'Clerk à configurer'}</span></div></div>
         </aside>
 
         <section className="workspace">
@@ -699,7 +742,7 @@ export default function ProductControl() {
               </div>
               <div className="table-wrap">
                 <table>
-                  <thead><tr><th className="product-col">Product / brand</th><th>Store</th><th>Currency</th><th>CJ cost USD</th><th>Sale price</th><th>Shipping USD</th><th>Route & ETA</th><th>Stock</th><th>Margin</th><th>Sync</th><th /></tr></thead>
+                  <thead><tr><th className="product-col">Product / brand</th><th>Store</th><th>Currency</th><th>CJ cost USD</th><th>Sale price</th><th>Temu</th><th>Amazon</th><th>Shipping USD</th><th>Route & ETA</th><th>Stock</th><th>Margin</th><th>Sync</th><th /></tr></thead>
                   <tbody>{pageProducts.map((product) => {
                     const margin = calculateProductMargin(product);
                     const percent = Math.round(margin.marginRate * 100);
@@ -710,6 +753,11 @@ export default function ProductControl() {
                         <td><span className="currency-pill">{product.saleCurrency}</span></td>
                         <td className="number"><strong>{formatCurrency(product.cjCostUsd, 'USD')}</strong><small>{product.cjSku || product.pid}</small></td>
                         <td className="number"><strong>{formatCurrency(product.salePrice, product.saleCurrency)}</strong><small>Store price</small></td>
+                        {['Temu', 'Amazon'].map((competitorName) => {
+                          const offer = product.competitors?.[competitorName.toLowerCase()];
+                          const difference = offer ? Number(product.salePrice) - Number(offer.price) : null;
+                          return <td key={competitorName} className="competitor-cell"><button type="button" onClick={() => openCompetitorEditor(product, competitorName)}><strong>{offer ? formatCurrency(offer.price, offer.currencyCode || product.saleCurrency) : '+ Add price'}</strong><small>{offer ? `${difference >= 0 ? '+' : ''}${formatCurrency(difference, product.saleCurrency)} vs ${competitorName}` : `Manual · ${marketFor(product)}`}</small></button></td>;
+                        })}
                         <td><strong>{formatCurrency(product.shippingUsd, 'USD')}</strong><small className={product.shippingIncluded ? 'included' : 'separate'}>{product.shippingIncluded ? `● Included · FX ${product.exchangeRate}` : '○ Charged apart'}</small></td>
                         <td><strong className="route">{product.shippingOrigin} <span>→</span> {product.shippingDestination}</strong><small>{product.transportMethod} · {product.minDeliveryDays}-{product.maxDeliveryDays} days</small></td>
                         <td><strong className={product.stock <= 10 ? 'danger-text' : ''}>{product.stock}</strong><small>{product.stock <= 10 ? 'Low stock' : 'Available'}</small></td>
@@ -718,7 +766,7 @@ export default function ProductControl() {
                         <td><button className="row-menu" onClick={() => openEditProduct(product)} aria-label={`Edit ${product.name}`}><Icon name="dots" /></button></td>
                       </tr>
                     );
-                  })}{!pageProducts.length && <tr><td colSpan={11} className="empty">No products match these filters.</td></tr>}</tbody>
+                  })}{!pageProducts.length && <tr><td colSpan={13} className="empty">No products match these filters.</td></tr>}</tbody>
                 </table>
               </div>
               <footer className="table-footer"><span>Showing {pageProducts.length} of {filtered.length} products</span><div><button disabled={page === 1} onClick={() => setPage(page - 1)}>←</button>{Array.from({ length: totalPages }).slice(0, 5).map((_, index) => <button key={index + 1} className={page === index + 1 ? 'page-active' : ''} onClick={() => setPage(index + 1)}>{index + 1}</button>)}<button disabled={page === totalPages} onClick={() => setPage(page + 1)}>→</button></div></footer>
@@ -744,6 +792,20 @@ export default function ProductControl() {
                 <div className="preview-margin"><span>Estimated margin</span><strong>{formatPercent(currentMargin.marginRate)}</strong><small>{formatCurrency(currentMargin.profit, currentMargin.saleCurrency)} net · sale price - CJ cost{editingProduct.shippingIncluded ? ' - included shipping' : ''}</small></div>
               </div>
               <div className="modal-actions">{editingProduct.id && <button type="button" className="btn danger" onClick={() => archiveProduct(editingProduct)}>Archive</button>}<button type="button" className="btn secondary" onClick={() => setModalOpen(false)}>Cancel</button><button className="btn primary" type="submit">{editingProduct.id ? 'Save product' : 'Create product'}</button></div>
+            </form>
+          </div>
+        )}
+        {competitorEditor && (
+          <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && setCompetitorEditor(null)}>
+            <form className="modal competitor-modal" role="dialog" aria-modal="true" onSubmit={saveCompetitor}>
+              <div className="modal-head"><div><span>MANUAL MARKET PRICE · {marketFor(competitorEditor.product)}</span><h2>{competitorEditor.competitorName} comparison</h2></div><button type="button" onClick={() => setCompetitorEditor(null)} aria-label="Close"><Icon name="close" /></button></div>
+              <div className="modal-body">
+                <div className="competitor-product"><ProductVisual product={competitorEditor.product} /><div><strong>{competitorEditor.product.name}</strong><span>{competitorEditor.product.sku} · Dosalga {formatCurrency(competitorEditor.product.salePrice, competitorEditor.product.saleCurrency)}</span></div></div>
+                <div className="form-grid"><label>{competitorEditor.competitorName} price ({competitorEditor.product.saleCurrency})<input required min="0" type="number" step="0.01" value={competitorEditor.price} onChange={(event) => setCompetitorEditor((current) => ({ ...current, price: event.target.value }))} /></label><label>Shipping ({competitorEditor.product.saleCurrency})<input min="0" type="number" step="0.01" value={competitorEditor.shippingCost} onChange={(event) => setCompetitorEditor((current) => ({ ...current, shippingCost: event.target.value }))} /></label></div>
+                <label>Product link (optional)<input type="url" value={competitorEditor.url} onChange={(event) => setCompetitorEditor((current) => ({ ...current, url: event.target.value }))} placeholder={`https://${competitorEditor.competitorName.toLowerCase()}...`} /></label>
+                <p className="history-note">Every save creates a dated price snapshot in Railway. MX and US values remain separate.</p>
+              </div>
+              <div className="modal-actions"><button type="button" className="btn secondary" onClick={() => setCompetitorEditor(null)}>Cancel</button><button className="btn primary" type="submit" disabled={savingCompetitor}>{savingCompetitor ? 'Saving…' : 'Save comparison'}</button></div>
             </form>
           </div>
         )}
