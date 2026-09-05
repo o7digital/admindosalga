@@ -52,6 +52,10 @@ const iconPaths = {
   dots: 'M5 12h.01M12 12h.01M19 12h.01',
   chevron: 'm9 18 6-6-6-6',
   close: 'M18 6 6 18M6 6l12 12',
+  card: 'M3 5h18v14H3zM3 10h18M7 15h4',
+  users: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4M9 13a4 4 0 1 0 0-8 4 4 0 0 0 0 8m13 8v-2a4 4 0 0 0-3-3.87m-2-7.96a4 4 0 0 1 0 7.75',
+  eye: 'M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12m10 3a3 3 0 1 0 0-6 3 3 0 0 0 0 6',
+  arrow: 'M5 12h14m-6-6 6 6-6 6',
 };
 
 function Icon({ name, size = 19 }) {
@@ -119,6 +123,121 @@ function ProductVisual({ product }) {
   const category = product.category || '';
   const key = ['Women', 'Activewear'].includes(category) ? 'set' : category === 'Accessories' ? 'bag' : category === 'Outerwear' ? 'jacket' : 'tee';
   return <div className={`product-visual ${key}`}><span /></div>;
+}
+
+const sponsorPlacements = [
+  { name: 'Homepage Hero', format: 'Desktop + mobile', price: '$1,200', period: '/ 30 days', market: 'Both', reach: '84K', availability: '1 of 2 left', tone: 'coral' },
+  { name: 'Discovery Spotlight', format: 'Category + search', price: '$750', period: '/ 30 days', market: 'USA', reach: '46K', availability: '3 of 6 left', tone: 'violet' },
+  { name: 'Wellness Edit', format: 'Editorial placement', price: '$490', period: '/ feature', market: 'México', reach: '31K', availability: '2 of 4 left', tone: 'gold' },
+];
+
+const sponsorCampaigns = [
+  { brand: 'ALMA', name: 'Alma Active', campaign: 'Move with intention', placement: 'Homepage Hero', market: 'Both', dates: 'Sep 08 — Oct 08', amount: '$2,040', payment: 'Paid', status: 'Scheduled', performance: '—', color: '#ef3f52' },
+  { brand: 'NL', name: 'Nopal Lab', campaign: 'Daily wellness ritual', placement: 'Wellness Edit', market: 'México', dates: 'Sep 01 — Sep 30', amount: '$8,490 MXN', payment: 'Paid', status: 'Live', performance: '2.8% CTR', color: '#387c68' },
+  { brand: 'CN', name: 'Casa Norte', campaign: 'Carry what matters', placement: 'Discovery Spotlight', market: 'USA', dates: 'Oct 01 — Oct 31', amount: '$750', payment: 'Pending', status: 'Creative review', performance: '—', color: '#23252b' },
+];
+
+const socioPartners = [
+  { initials: 'AA', name: 'Alma Active', contact: 'Sofía Mendoza', market: 'Both', plan: 'Signature', budget: '$2,040 USD', status: 'Active', campaigns: 2, renewal: 'Oct 08', color: '#ef3f52' },
+  { initials: 'NL', name: 'Nopal Lab', contact: 'Diego Chávez', market: 'México', plan: 'Growth', budget: '$8,490 MXN', status: 'Active', campaigns: 1, renewal: 'Sep 30', color: '#387c68' },
+  { initials: 'CN', name: 'Casa Norte', contact: 'Maya Brooks', market: 'USA', plan: 'Launch', budget: '$750 USD', status: 'Onboarding', campaigns: 1, renewal: 'Oct 31', color: '#23252b' },
+  { initials: 'MB', name: 'Marea Beauty', contact: 'Lucía Torres', market: 'Both', plan: 'Proposal', budget: '$1,680 USD', status: 'Proposal', campaigns: 0, renewal: '—', color: '#9c6b8d' },
+];
+
+function GrowthMetric({ label, value, detail, accent }) {
+  return <article className={accent ? `growth-metric ${accent}` : 'growth-metric'}><span>{label}</span><strong>{value}</strong><small>{detail}</small></article>;
+}
+
+function MarketLabel({ market }) {
+  if (market === 'Both') return <span className="growth-market"><span className="flag us" /><span className="flag mx" /> USA + México</span>;
+  return <span className="growth-market"><span className={`flag ${market === 'USA' ? 'us' : 'mx'}`} /> {market}</span>;
+}
+
+function SponsorsDashboard({ market, notify }) {
+  const campaigns = sponsorCampaigns.filter((campaign) => market === 'All' || campaign.market === market || campaign.market === 'Both');
+  const placements = sponsorPlacements.filter((placement) => market === 'All' || placement.market === market || placement.market === 'Both');
+
+  return (
+    <section className="growth-dashboard">
+      <div className="growth-disclaimer"><span>Concept preview</span> Sample data for Guillermo · Stripe checkout shown as proposed experience</div>
+      <div className="growth-metrics">
+        <GrowthMetric label="Sponsor revenue" value="$8,940" detail="USD equivalent · this month" accent="red" />
+        <GrowthMetric label="Live campaigns" value={market === 'All' ? '6' : market === 'USA' ? '3' : '4'} detail="Across premium placements" />
+        <GrowthMetric label="Inventory sold" value="72%" detail="9 of 12 premium slots" accent="green" />
+        <GrowthMetric label="Awaiting payment" value="$2,750" detail="2 Stripe checkouts open" accent="dark" />
+      </div>
+
+      <div className="sponsor-hero">
+        <div className="sponsor-hero-copy">
+          <span className="hero-kicker">DOSALGA BRAND MEDIA</span>
+          <h2>Turn attention into<br />sponsor revenue.</h2>
+          <p>Sell premium visibility directly inside the Dosalga shopping journey—one proposal, two markets, measurable performance.</p>
+          <div className="hero-actions"><button className="btn hero-primary" onClick={() => notify('Sponsor proposal preview opened')}><Icon name="plus" /> Build a proposal</button><button className="hero-link" onClick={() => notify('Media kit preview opened')}>View media kit <Icon name="arrow" size={15} /></button></div>
+        </div>
+        <div className="stripe-preview">
+          <div className="stripe-top"><span className="stripe-word">stripe</span><span className="paid-check">✓</span></div>
+          <span>Payment received</span>
+          <strong>$1,200.00 USD</strong>
+          <p>Alma Active · Homepage Hero</p>
+          <div className="stripe-meta"><span>Mexico + USA</span><span>•••• 4242</span></div>
+        </div>
+      </div>
+
+      <div className="growth-section-head"><div><span>Ad inventory</span><h2>Premium placements</h2></div><button onClick={() => notify('Placement inventory editor opened')}>Manage inventory <Icon name="arrow" size={14} /></button></div>
+      <div className="placement-grid">
+        {placements.map((placement) => <article className={`placement-card ${placement.tone}`} key={placement.name}>
+          <div className="placement-visual"><span>AD</span><div><i /><i /><i /></div><b>{placement.name}</b></div>
+          <div className="placement-body"><div><span>{placement.format}</span><MarketLabel market={placement.market} /></div><h3>{placement.name}</h3><p><strong>{placement.price}</strong> {placement.period}</p><footer><span><Icon name="eye" size={14} /> {placement.reach} est. views</span><em>{placement.availability}</em></footer></div>
+        </article>)}
+      </div>
+
+      <section className="growth-table-card">
+        <div className="growth-section-head compact"><div><span>Campaign desk</span><h2>Bookings & creative approvals</h2></div><button onClick={() => notify('All sponsor campaigns opened')}>View all campaigns <Icon name="arrow" size={14} /></button></div>
+        <div className="growth-table-wrap"><table className="growth-table"><thead><tr><th>Brand</th><th>Campaign</th><th>Market</th><th>Flight</th><th>Investment</th><th>Stripe</th><th>Status</th><th>Performance</th></tr></thead><tbody>{campaigns.map((campaign) => <tr key={campaign.name}><td><div className="brand-cell"><span style={{ background: campaign.color }}>{campaign.brand}</span><strong>{campaign.name}</strong></div></td><td><strong>{campaign.campaign}</strong><small>{campaign.placement}</small></td><td><MarketLabel market={campaign.market} /></td><td>{campaign.dates}</td><td><strong>{campaign.amount}</strong></td><td><span className={`payment-pill ${campaign.payment.toLowerCase()}`}>{campaign.payment === 'Paid' ? '✓ ' : ''}{campaign.payment}</span></td><td><span className="campaign-status">{campaign.status}</span></td><td><strong>{campaign.performance}</strong></td></tr>)}</tbody></table></div>
+      </section>
+    </section>
+  );
+}
+
+function SociosDashboard({ market, notify }) {
+  const partners = socioPartners.filter((partner) => market === 'All' || partner.market === market || partner.market === 'Both');
+  const featured = partners[0] || socioPartners[0];
+
+  return (
+    <section className="growth-dashboard">
+      <div className="growth-disclaimer"><span>Concept preview</span> Sample partner accounts · CRM and campaign results proposed for Guillermo</div>
+      <div className="growth-metrics">
+        <GrowthMetric label="Brand partners" value="12" detail="8 active · 4 in pipeline" accent="red" />
+        <GrowthMetric label="Contract value" value="$21.4K" detail="USD equivalent · active terms" />
+        <GrowthMetric label="Campaigns live" value="8" detail="5 USA · 6 México" accent="green" />
+        <GrowthMetric label="Renewal opportunity" value="$6.8K" detail="Next 30 days" accent="dark" />
+      </div>
+
+      <div className="socios-layout">
+        <section className="partner-directory">
+          <div className="growth-section-head compact"><div><span>Partner CRM</span><h2>Socios & prospects</h2></div><button onClick={() => notify('Partner filters opened')}>Filter <Icon name="chevron" size={13} /></button></div>
+          <div className="partner-list">{partners.map((partner, index) => <button className={`partner-row ${index === 0 ? 'selected' : ''}`} key={partner.name} onClick={() => notify(`${partner.name} workspace opened`)}>
+            <span className="partner-logo" style={{ background: partner.color }}>{partner.initials}</span><span className="partner-identity"><strong>{partner.name}</strong><small>{partner.contact} · {partner.plan}</small></span><MarketLabel market={partner.market} /><span className={`partner-status ${partner.status.toLowerCase()}`}>{partner.status}</span><span className="partner-budget"><strong>{partner.budget}</strong><small>{partner.campaigns} campaign{partner.campaigns === 1 ? '' : 's'}</small></span><Icon name="chevron" size={15} />
+          </button>)}</div>
+        </section>
+
+        <aside className="partner-focus">
+          <div className="focus-head"><span className="partner-logo large" style={{ background: featured.color }}>{featured.initials}</span><div><span>PARTNER SPOTLIGHT</span><h2>{featured.name}</h2><p>{featured.contact} · Brand lead</p></div><button onClick={() => notify('Socio workspace opened')}><Icon name="dots" /></button></div>
+          <div className="focus-plan"><div><span>Signature partner</span><strong>USA + México</strong></div><span className="partner-status active">Active</span></div>
+          <div className="focus-stats"><div><span>Impressions</span><strong>118.4K</strong><small>↑ 18.2%</small></div><div><span>Clicks</span><strong>3,420</strong><small>2.89% CTR</small></div><div><span>Attributed sales</span><strong>$6,840</strong><small>3.4× ROAS</small></div></div>
+          <div className="onboarding"><div><span>Campaign readiness</span><strong>4 / 5 complete</strong></div><div className="onboarding-track"><i /></div><ul><li className="done">Brand profile approved</li><li className="done">Stripe payment verified</li><li className="done">Creative assets delivered</li><li>Final homepage approval</li></ul></div>
+          <button className="focus-action" onClick={() => notify('Performance report opened')}>Open partner report <Icon name="arrow" size={16} /></button>
+        </aside>
+      </div>
+
+      <section className="partner-pipeline">
+        <div className="growth-section-head compact"><div><span>Sales pipeline</span><h2>From first contact to renewal</h2></div><strong>$13,230 potential revenue</strong></div>
+        <div className="pipeline-stages">{[
+          ['New lead', '5', '$4.2K'], ['Proposal sent', '3', '$5.1K'], ['Stripe checkout', '2', '$2.4K'], ['Campaign live', '8', '$8.9K'], ['Renewal', '4', '$6.8K'],
+        ].map(([label, count, amount], index) => <div key={label}><span>{String(index + 1).padStart(2, '0')}</span><p>{label}</p><strong>{count}</strong><small>{amount}</small></div>)}</div>
+      </section>
+    </section>
+  );
 }
 
 export default function ProductControl() {
@@ -440,6 +559,13 @@ export default function ProductControl() {
     notify(`Olivia One analysis ready · ${result.mode}`);
   };
 
+  const isGrowthWorkspace = activeView === 'Sponsors' || activeView === 'Socios';
+  const viewPresentation = activeView === 'Sponsors'
+    ? { title: 'Sponsor revenue', eyebrow: 'DOSALGA MEDIA', subtitle: 'Sell premium brand visibility across Dosalga USA and México—with campaign inventory, creative approval and Stripe payments in one place.' }
+    : activeView === 'Socios'
+      ? { title: 'Brand partners', eyebrow: 'DOSALGA PARTNERS', subtitle: 'Manage every advertiser relationship from first proposal to payment, live campaign performance and renewal.' }
+      : { title: activeView === 'Products' ? 'Product inventory' : activeView, eyebrow: 'DOSALGA COMMERCE', subtitle: 'One catalogue. Two markets. Every cost and margin under control.' };
+
   return (
     <>
       <Head>
@@ -495,16 +621,18 @@ export default function ProductControl() {
           <div className="content">
             {error && <div className="error-banner">{error}</div>}
             <div className="title-row">
-              <div><div className="eyebrow"><span /> DOSALGA COMMERCE</div><h1>{activeView === 'Products' ? 'Product inventory' : activeView}</h1><p>One catalogue. Two markets. Every cost and margin under control.</p></div>
-              <div className="title-actions"><button className="btn secondary" onClick={importWordPress} disabled={importingWp}><Icon name="upload" />{importingWp ? 'Importing...' : 'Import WP'}</button><button className="btn secondary" onClick={syncCj} disabled={syncing}><span className={syncing ? 'spin' : ''}><Icon name="refresh" /></span>{syncButtonLabel}</button><button className="btn primary" onClick={openNewProduct}><Icon name="plus" /> Add product</button></div>
+              <div><div className="eyebrow"><span /> {viewPresentation.eyebrow}</div><h1>{viewPresentation.title}</h1><p>{viewPresentation.subtitle}</p></div>
+              {activeView === 'Sponsors' ? <div className="title-actions"><button className="btn secondary" onClick={() => notify('Stripe payments preview opened')}><Icon name="card" /> Stripe payments</button><button className="btn primary" onClick={() => notify('New campaign builder opened')}><Icon name="plus" /> New campaign</button></div>
+                : activeView === 'Socios' ? <div className="title-actions"><button className="btn secondary" onClick={() => notify('Partner pipeline opened')}><Icon name="chart" /> Pipeline</button><button className="btn primary" onClick={() => notify('Socio invitation created')}><Icon name="users" /> Invite socio</button></div>
+                  : <div className="title-actions"><button className="btn secondary" onClick={importWordPress} disabled={importingWp}><Icon name="upload" />{importingWp ? 'Importing...' : 'Import WP'}</button><button className="btn secondary" onClick={syncCj} disabled={syncing}><span className={syncing ? 'spin' : ''}><Icon name="refresh" /></span>{syncButtonLabel}</button><button className="btn primary" onClick={openNewProduct}><Icon name="plus" /> Add product</button></div>}
             </div>
 
-            <div className="metrics">
+            {!isGrowthWorkspace && <div className="metrics">
               <article><span>Active products</span><div className="metric-line"><strong>{metrics.active}</strong></div><small>Across both stores</small></article>
               <article><span>Average margin</span><div className="metric-line"><strong>{formatPercent(metrics.averageMargin)}</strong></div><small>After included shipping</small></article>
               <article><span>Shipping included</span><div className="metric-line"><strong>{metrics.active ? Math.round((metrics.included / metrics.active) * 100) : 0}%</strong></div><small>{metrics.included} of {metrics.active} products</small><div className="progress"><i style={{ width: `${metrics.active ? (metrics.included / metrics.active) * 100 : 0}%` }} /></div></article>
               <article className="attention-card"><span>Needs attention</span><div className="metric-line"><strong>{metrics.attention}</strong><em>Review</em></div><small>Low stock, margin or CJ changes</small></article>
-            </div>
+            </div>}
 
             {activeView === 'Overview' && (
               <section className="insight-grid">
@@ -536,19 +664,11 @@ export default function ProductControl() {
             )}
 
             {activeView === 'Sponsors' && (
-              <section className="mockup-board">
-                <article className="mockup-panel wide"><h2>Campaign pipeline</h2><div className="kanban-row"><span>Homepage banner</span><strong>$1,200 USD</strong><em>Booked</em></div><div className="kanban-row"><span>Product page placement</span><strong>$750 USD</strong><em>Draft</em></div><div className="kanban-row"><span>Collection takeover</span><strong>$2,400 USD</strong><em>Review</em></div></article>
-                <article className="mockup-panel"><h2>Inventory</h2><div className="big-number">8</div><p>Available sponsor placements across USA and México stores.</p></article>
-                <article className="mockup-panel"><h2>Fields</h2><p>Sponsor, campaign, store, placement, dates, budget, creative, target link, status.</p></article>
-              </section>
+              <SponsorsDashboard market={market} notify={notify} />
             )}
 
             {activeView === 'Socios' && (
-              <section className="mockup-board">
-                <article className="mockup-panel wide"><h2>Socio workspaces</h2><div className="kanban-row"><span>Fitness Partner MX</span><strong>34 products</strong><em>Active</em></div><div className="kanban-row"><span>Wellness USA Retail</span><strong>18 products</strong><em>Setup</em></div><div className="kanban-row"><span>Creator Store Pilot</span><strong>12 products</strong><em>Limited</em></div></article>
-                <article className="mockup-panel"><h2>Model</h2><p>Socio, assigned products, commission, orders generated, branding and restricted access.</p></article>
-                <article className="mockup-panel"><h2>Revenue</h2><div className="big-number">12%</div><p>Default Dosalga management fee placeholder.</p></article>
-              </section>
+              <SociosDashboard market={market} notify={notify} />
             )}
 
             {activeView === 'Reporting IA' && (
