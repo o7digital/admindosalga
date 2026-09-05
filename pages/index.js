@@ -4,6 +4,8 @@ import { calculateProductMargin, formatCurrency, formatPercent } from '@/lib/mar
 
 const logoUrl = 'https://www.dosalga.store/logo-dosalga.png';
 const pageSize = 6;
+const cjBatchSize = 4;
+const productsCacheKey = 'dosalga-admin-products-v2';
 
 const blankProduct = {
   siteId: 'dosalga-usa',
@@ -110,20 +112,52 @@ export default function ProductControl() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(blankProduct);
   const [syncing, setSyncing] = useState(false);
+  const [syncProgress, setSyncProgress] = useState({ done: 0, total: 0 });
+  const [cjConnection, setCjConnection] = useState({ configured: false, connected: false, mode: 'checking' });
   const [importingWp, setImportingWp] = useState(false);
   const [oliviaLoading, setOliviaLoading] = useState(false);
   const [oliviaReport, setOliviaReport] = useState(null);
   const [toast, setToast] = useState('');
   const [error, setError] = useState('');
 
+  const persistProducts = (nextProducts) => {
+    try {
+      window.localStorage.setItem(productsCacheKey, JSON.stringify({
+        savedAt: new Date().toISOString(),
+        products: nextProducts,
+      }));
+    } catch {
+      // The current session remains usable if browser storage is unavailable.
+    }
+  };
+
   const loadProducts = async () => {
     const response = await fetch('/api/products');
     const result = await response.json();
-    setProducts((result.products || []).map(normalizeProduct));
+    let cachedProducts = null;
+
+    try {
+      const cached = JSON.parse(window.localStorage.getItem(productsCacheKey) || 'null');
+      cachedProducts = Array.isArray(cached?.products) ? cached.products : null;
+    } catch {
+      cachedProducts = null;
+    }
+
+    setProducts((cachedProducts || result.products || []).map(normalizeProduct));
+  };
+
+  const loadCjConnection = async () => {
+    const response = await fetch('/api/cj/status', { cache: 'no-store' });
+    const result = await response.json();
+    setCjConnection(result);
+    return result;
   };
 
   useEffect(() => {
     loadProducts().catch((loadError) => setError(loadError.message || 'Products could not be loaded.'));
+    loadCjConnection().catch((loadError) => {
+      setCjConnection({ configured: true, connected: false, mode: 'error', message: loadError.message });
+    });
   }, []);
 
   const categories = useMemo(() => ['All categories', ...new Set(products.map((product) => product.category).filter(Boolean))], [products]);
@@ -197,6 +231,12 @@ export default function ProductControl() {
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const pageProducts = filtered.slice((page - 1) * pageSize, page * pageSize);
   const currentMargin = calculateProductMargin(editingProduct);
+  const cjStatusLabel = cjConnection.mode === 'checking'
+    ? 'Checking'
+    : cjConnection.connected ? 'Live' : cjConnection.configured ? 'Error' : 'Setup';
+  const syncButtonLabel = syncing
+    ? `Syncing ${syncProgress.done}/${syncProgress.total}`
+    : 'Sync CJ';
 
   const notify = (message) => {
     setToast(message);
@@ -256,13 +296,13 @@ export default function ProductControl() {
       name: current.name || result.product.name,
       brand: result.product.brand,
       category: result.product.category,
+      imageUrl: current.imageUrl || result.product.imageUrl,
       sku: current.sku || result.product.cjSku,
       cjSku: result.product.cjSku,
       pid: result.product.pid,
       cjCost: result.product.cjCost,
       cjCostUsd: result.product.cjCost,
       cjCostCurrency: result.product.currency,
-      saleCurrency: result.product.currency,
       shippingCost: route.shippingCost || 0,
       shippingUsd: route.shippingCost || 0,
       shippingCurrency: result.product.currency,
@@ -279,16 +319,50 @@ export default function ProductControl() {
   const syncCj = async () => {
     setSyncing(true);
     setError('');
-    const response = await fetch('/api/cj/sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
-    const result = await response.json();
-    setSyncing(false);
-    if (!response.ok) {
-      setError(result.message || 'CJ sync failed.');
-      return;
+    setSyncProgress({ done: 0, total: 0 });
+
+    try {
+      const connection = await loadCjConnection();
+      if (!connection.connected) {
+        throw new Error(connection.message || 'CJ API key is not configured in this admin.');
+      }
+
+      const targets = products.filter((product) => (
+        !product.archived && (product.pid || product.cjSku || product.sku || product.cjProductUrl)
+      ));
+      let workingProducts = [...products];
+      let changeCount = 0;
+      let errorCount = 0;
+      setSyncProgress({ done: 0, total: targets.length });
+
+      for (let offset = 0; offset < targets.length; offset += cjBatchSize) {
+        const batch = targets.slice(offset, offset + cjBatchSize);
+        const response = await fetch('/api/cj/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ products: batch, includeFreight: false }),
+        });
+        const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(result.message || 'CJ sync failed.');
+        }
+
+        const updates = new Map((result.products || []).map((product) => [product.id, normalizeProduct(product)]));
+        workingProducts = workingProducts.map((product) => updates.get(product.id) || product);
+        changeCount += (result.reports || []).reduce((sum, report) => sum + (report.changes?.length || 0), 0);
+        errorCount += (result.reports || []).filter((report) => report.error).length;
+        setProducts(workingProducts);
+        setSyncProgress({ done: Math.min(offset + batch.length, targets.length), total: targets.length });
+      }
+
+      persistProducts(workingProducts);
+      notify(`CJ sync completed · ${changeCount} changes${errorCount ? ` · ${errorCount} errors` : ''}`);
+    } catch (syncError) {
+      setError(syncError.message || 'CJ sync failed.');
+    } finally {
+      setSyncing(false);
     }
-    setProducts((result.products || []).map(normalizeProduct));
-    const changes = (result.reports || []).reduce((sum, report) => sum + report.changes.length, 0);
-    notify(`CJ sync completed · ${changes} changes found`);
   };
 
   const importWordPress = async () => {
@@ -301,7 +375,9 @@ export default function ProductControl() {
       setError(result.message || 'WordPress import failed.');
       return;
     }
-    setProducts((result.products || []).map(normalizeProduct));
+    const importedProducts = (result.products || []).map(normalizeProduct);
+    setProducts(importedProducts);
+    persistProducts(importedProducts);
     const summary = (result.reports || []).map((report) => `${report.name}: ${report.count}`).join(' · ');
     notify(`WordPress import completed · ${summary}`);
   };
@@ -359,7 +435,7 @@ export default function ProductControl() {
               </button>
             ))}
             <p className="nav-label second">Connections</p>
-            <button className={`nav-item cj ${activeView === 'CJ Connection' ? 'active' : ''}`} onClick={() => setActiveView('CJ Connection')}><span className="cj-mark">CJ</span> CJdropshipping <span className="connected-dot" /></button>
+            <button className={`nav-item cj ${activeView === 'CJ Connection' ? 'active' : ''}`} onClick={() => setActiveView('CJ Connection')}><span className="cj-mark">CJ</span> CJdropshipping {cjConnection.connected && <span className="connected-dot" />}</button>
             <p className="nav-label second">Growth</p>
             {[
               ['Sponsors', 'grid'],
@@ -372,7 +448,7 @@ export default function ProductControl() {
               </button>
             ))}
           </nav>
-          <div className="sidebar-note"><div className="note-top"><span>CJ connection</span><span className="online">● Demo</span></div><strong>2 stores synchronized</strong><p>Last update · {new Date().toLocaleDateString('en-US')}</p></div>
+          <div className="sidebar-note"><div className="note-top"><span>CJ connection</span><span className={cjConnection.connected ? 'online' : ''}>● {cjStatusLabel}</span></div><strong>2 stores connected</strong><p>MX + USA backends</p></div>
           <div className="profile"><div className="avatar">OS</div><div><strong>Olivier</strong><span>Administrator</span></div><Icon name="dots" /></div>
         </aside>
 
@@ -393,7 +469,7 @@ export default function ProductControl() {
             {error && <div className="error-banner">{error}</div>}
             <div className="title-row">
               <div><div className="eyebrow"><span /> DOSALGA COMMERCE</div><h1>{activeView === 'Products' ? 'Product inventory' : activeView}</h1><p>One catalogue. Two markets. Every cost and margin under control.</p></div>
-              <div className="title-actions"><button className="btn secondary" onClick={importWordPress} disabled={importingWp}><Icon name="upload" />{importingWp ? 'Importing...' : 'Import WP'}</button><button className="btn secondary" onClick={syncCj} disabled={syncing}><span className={syncing ? 'spin' : ''}><Icon name="refresh" /></span>{syncing ? 'Syncing...' : 'Sync CJ'}</button><button className="btn primary" onClick={openNewProduct}><Icon name="plus" /> Add product</button></div>
+              <div className="title-actions"><button className="btn secondary" onClick={importWordPress} disabled={importingWp}><Icon name="upload" />{importingWp ? 'Importing...' : 'Import WP'}</button><button className="btn secondary" onClick={syncCj} disabled={syncing}><span className={syncing ? 'spin' : ''}><Icon name="refresh" /></span>{syncButtonLabel}</button><button className="btn primary" onClick={openNewProduct}><Icon name="plus" /> Add product</button></div>
             </div>
 
             <div className="metrics">
@@ -427,7 +503,7 @@ export default function ProductControl() {
 
             {activeView === 'CJ Connection' && (
               <section className="insight-grid">
-                <article><h2>Connection state</h2><div className="big-number">Demo</div><p>Live CJ credentials are not configured in this app yet.</p><button className="btn primary" onClick={syncCj} disabled={syncing}><Icon name="refresh" /> {syncing ? 'Syncing...' : 'Run CJ sync'}</button></article>
+                <article><h2>Connection state</h2><div className="big-number">{cjStatusLabel}</div><p>{cjConnection.connected ? 'CJ API v2 is connected. Bulk sync refreshes product cost and inventory; product import also retrieves freight routes.' : cjConnection.message || 'Add CJ_API_KEY to the server environment to enable live synchronization.'}</p><button className="btn primary" onClick={syncCj} disabled={syncing || !cjConnection.connected}><Icon name="refresh" /> {syncButtonLabel}</button></article>
                 <article><h2>Product linking</h2><div className="insight-row"><span>Linked to CJ</span><strong>{cjSummary.linked}</strong></div><div className="insight-row"><span>Unlinked</span><strong>{cjSummary.unlinked}</strong></div><div className="insight-row"><span>Synced at least once</span><strong>{cjSummary.synced}</strong></div><div className="insight-row"><span>Open changes</span><strong>{cjSummary.changes}</strong></div></article>
               </section>
             )}

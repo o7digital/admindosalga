@@ -1,34 +1,49 @@
-import fs from 'fs/promises';
-import path from 'path';
 import { syncCjProduct } from '@/services/cjdropshipping';
 
-const dataFile = path.join(process.cwd(), 'data', 'products.json');
-
-const readProducts = async () => JSON.parse(await fs.readFile(dataFile, 'utf8'));
-const writeProducts = async (products) => fs.writeFile(dataFile, `${JSON.stringify(products, null, 2)}\n`);
+const MAX_BATCH_SIZE = 4;
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' });
   }
 
-  try {
-    const products = await readProducts();
-    const { productId } = req.body || {};
-    const targets = productId ? products.filter((product) => product.id === productId) : products.filter((product) => !product.archived);
-    const reports = [];
-    const nextProducts = [...products];
+  const requestedProducts = Array.isArray(req.body?.products) ? req.body.products : [];
+  if (requestedProducts.length === 0) {
+    return res.status(400).json({ message: 'At least one product is required for CJ sync.' });
+  }
 
-    for (const product of targets) {
-      const result = await syncCjProduct(product);
-      const index = nextProducts.findIndex((item) => item.id === product.id);
-      nextProducts[index] = result.product;
-      reports.push({ productId: product.id, changes: result.changes, mode: result.mode });
+  if (requestedProducts.length > MAX_BATCH_SIZE) {
+    return res.status(400).json({ message: `CJ sync accepts up to ${MAX_BATCH_SIZE} products per batch.` });
+  }
+
+  const includeFreight = Boolean(req.body?.includeFreight);
+  const results = await Promise.allSettled(
+    requestedProducts.map((product) => syncCjProduct(product, { includeFreight }))
+  );
+  const products = [];
+  const reports = results.map((result, index) => {
+    const sourceProduct = requestedProducts[index];
+
+    if (result.status === 'fulfilled') {
+      products.push(result.value.product);
+      return {
+        productId: sourceProduct.id,
+        changes: result.value.changes,
+        mode: result.value.mode,
+      };
     }
 
-    await writeProducts(nextProducts);
-    return res.status(200).json({ syncedAt: new Date().toISOString(), reports, products: nextProducts });
-  } catch (error) {
-    return res.status(500).json({ message: error.message || 'CJ sync failed' });
-  }
+    return {
+      productId: sourceProduct.id,
+      changes: [],
+      mode: 'error',
+      error: result.reason?.message || 'CJ sync failed',
+    };
+  });
+
+  return res.status(200).json({
+    syncedAt: new Date().toISOString(),
+    reports,
+    products,
+  });
 }

@@ -2,14 +2,14 @@ const storeSources = [
   {
     id: 'dosalga-mexico',
     name: 'Dosalga México',
-    url: process.env.DOSALGA_MEXICO_WP_URL || 'https://oliviers44.sg-host.com',
+    url: process.env.DOSALGA_MEXICO_WP_URL || 'https://wp-dosalga-mx.o7digitalgroup.com',
     currency: 'MXN',
     destination: 'México',
   },
   {
     id: 'dosalga-usa',
     name: 'Dosalga USA',
-    url: process.env.DOSALGA_USA_WP_URL || 'https://oliviers55.sg-host.com',
+    url: process.env.DOSALGA_USA_WP_URL || 'https://wp-dosalga-us.o7digitalgroup.com',
     currency: 'USD',
     destination: 'USA',
   },
@@ -28,12 +28,11 @@ const getMeta = (product, key) => {
 };
 
 const fetchStoreProducts = async (source) => {
-  const products = [];
-
-  for (let page = 1; page <= 10; page += 1) {
+  const fetchPage = async (page) => {
     const url = new URL('/wp-json/wc/store/v1/products', source.url);
     url.searchParams.set('per_page', '100');
     url.searchParams.set('page', String(page));
+    url.searchParams.set('_fields', 'id,name,permalink,sku,prices,images,categories,is_in_stock,low_stock_remaining');
 
     const response = await fetch(url.toString(), {
       headers: { Accept: 'application/json' },
@@ -44,17 +43,31 @@ const fetchStoreProducts = async (source) => {
     }
 
     const pageProducts = await response.json();
-    if (!Array.isArray(pageProducts) || pageProducts.length === 0) break;
-    products.push(...pageProducts);
-    if (pageProducts.length < 100) break;
-  }
+    if (!Array.isArray(pageProducts)) {
+      throw new Error(`${source.name} returned an unexpected product payload`);
+    }
 
-  return products;
+    return {
+      products: pageProducts,
+      totalPages: Number(response.headers.get('x-wp-totalpages')) || 1,
+    };
+  };
+
+  const firstPage = await fetchPage(1);
+  const totalPages = Math.min(firstPage.totalPages, 10);
+  if (totalPages <= 1) return firstPage.products;
+
+  const remainingPages = await Promise.all(
+    Array.from({ length: totalPages - 1 }, (_, index) => fetchPage(index + 2))
+  );
+
+  return [firstPage, ...remainingPages].flatMap((page) => page.products);
 };
 
 const mapWooProduct = (product, source) => {
   const category = product.categories?.[0]?.name || 'General';
-  const stock = product.stock_quantity ?? (product.stock_status === 'instock' ? 25 : 0);
+  const isInStock = product.is_in_stock ?? product.stock_status === 'instock';
+  const stock = product.stock_quantity ?? (isInStock ? 25 : 0);
   const rawPrice = asNumber(product.prices?.price || product.price || product.sale_price || product.regular_price);
   const minorUnit = Number(product.prices?.currency_minor_unit ?? 2);
   const storePrice = rawPrice / (10 ** minorUnit);
@@ -98,12 +111,12 @@ const mapWooProduct = (product, source) => {
     maxDeliveryDays: asNumber(getMeta(product, 'max_delivery_days') || 14),
     platformFeeRate: 0,
     taxRate: 0,
-    status: product.status === 'publish' && stock !== 0 ? 'approved' : 'review',
+    status: stock !== 0 ? 'approved' : 'review',
     archived: false,
     lastWooImportAt: now,
     lastCjSyncAt: null,
     cjChangeReport: [],
-    notes: `Imported from ${source.name} WordPress app (${source.url}).`,
+    notes: `Imported from ${source.name} WooCommerce backend (${source.url}).`,
     createdAt: product.date_created ? new Date(product.date_created).toISOString() : now,
     updatedAt: product.date_modified ? new Date(product.date_modified).toISOString() : now,
   };
