@@ -94,8 +94,29 @@ function marketFor(product) {
   return product.siteId === 'dosalga-usa' ? 'USA' : 'México';
 }
 
-function ProductVisual({ category = '', imageUrl = '' }) {
-  if (imageUrl) return <img className="product-photo" src={imageUrl} alt="" />;
+function ProductVisual({ product }) {
+  const [source, setSource] = useState(product.imageUrl || '');
+  const [fallbackAttempted, setFallbackAttempted] = useState(false);
+
+  useEffect(() => {
+    setSource(product.imageUrl || '');
+    setFallbackAttempted(false);
+  }, [product.id, product.imageUrl]);
+
+  const useCjFallback = () => {
+    const query = product.pid || product.cjSku || product.sku;
+    if (!fallbackAttempted && query) {
+      setFallbackAttempted(true);
+      setSource(`/api/cj/image?productId=${encodeURIComponent(product.id)}&query=${encodeURIComponent(query)}`);
+      return;
+    }
+    setSource('');
+  };
+
+  if (source) {
+    return <img className="product-photo" src={source} alt={product.name || ''} onError={useCjFallback} loading="lazy" />;
+  }
+  const category = product.category || '';
   const key = ['Women', 'Activewear'].includes(category) ? 'set' : category === 'Accessories' ? 'bag' : category === 'Outerwear' ? 'jacket' : 'tee';
   return <div className={`product-visual ${key}`}><span /></div>;
 }
@@ -563,7 +584,7 @@ export default function ProductControl() {
                     const percent = Math.round(margin.marginRate * 100);
                     return (
                       <tr key={product.id}>
-                        <td><div className="product-cell"><ProductVisual category={product.category} imageUrl={product.imageUrl} /><div><strong>{product.productUrl ? <a href={product.productUrl} target="_blank" rel="noreferrer">{product.name}</a> : product.name}</strong><span>{product.brand} · {product.sku}</span><small className={`status ${product.status === 'paused' || product.status === 'review' ? 'review' : product.stock <= 10 ? 'low-stock' : ''}`}>{product.status}</small></div></div></td>
+                        <td><div className="product-cell"><ProductVisual product={product} /><div><strong>{product.productUrl ? <a href={product.productUrl} target="_blank" rel="noreferrer">{product.name}</a> : product.name}</strong><span>{product.brand} · {product.sku}</span><small className={`status ${product.status === 'paused' || product.status === 'review' ? 'review' : product.stock <= 10 ? 'low-stock' : ''}`}>{product.status}</small></div></div></td>
                         <td><span className={`market-badge ${marketFor(product) === 'USA' ? 'usa' : 'mexico'}`}>{marketFor(product) !== 'Both' && <span className={`flag ${marketFor(product) === 'USA' ? 'us' : 'mx'}`} />}{marketFor(product)}</span></td>
                         <td><span className="currency-pill">{product.saleCurrency}</span></td>
                         <td className="number"><strong>{formatCurrency(product.cjCostUsd, 'USD')}</strong><small>{product.cjSku || product.pid}</small></td>

@@ -246,6 +246,13 @@ export const importCjProduct = async ({ query, destination = 'USA', includeFreig
   };
 };
 
+export const getCjProductImage = async (input) => {
+  const result = await queryProduct(input);
+  const imageUrl = String(result.data?.bigImage || result.data?.productImageSet?.[0] || '').trim();
+  if (!imageUrl) throw new Error(`CJ product image not found for ${result.identifier}`);
+  return imageUrl;
+};
+
 export const syncCjProduct = async (product, { includeFreight = false } = {}) => {
   const imported = await importCjProduct({
     query: product.pid || product.cjSku || product.sku || product.cjProductUrl,
@@ -278,6 +285,7 @@ export const syncCjProduct = async (product, { includeFreight = false } = {}) =>
       cjCost: cjProduct.cjCost,
       cjCostUsd: cjProduct.cjCost,
       cjCostCurrency: 'USD',
+      imageUrl: cjProduct.imageUrl || product.imageUrl,
       ...(includeFreight && route.shippingCost !== undefined ? {
         shippingCost: route.shippingCost,
         shippingUsd: route.shippingCost,
