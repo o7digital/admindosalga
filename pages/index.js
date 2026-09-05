@@ -138,10 +138,10 @@ const sponsorCampaigns = [
 ];
 
 const socioPartners = [
-  { initials: 'AA', name: 'Alma Active', contact: 'Sofía Mendoza', market: 'Both', plan: 'Signature', budget: '$2,040 USD', status: 'Active', campaigns: 2, renewal: 'Oct 08', color: '#ef3f52' },
-  { initials: 'NL', name: 'Nopal Lab', contact: 'Diego Chávez', market: 'México', plan: 'Growth', budget: '$8,490 MXN', status: 'Active', campaigns: 1, renewal: 'Sep 30', color: '#387c68' },
-  { initials: 'CN', name: 'Casa Norte', contact: 'Maya Brooks', market: 'USA', plan: 'Launch', budget: '$750 USD', status: 'Onboarding', campaigns: 1, renewal: 'Oct 31', color: '#23252b' },
-  { initials: 'MB', name: 'Marea Beauty', contact: 'Lucía Torres', market: 'Both', plan: 'Proposal', budget: '$1,680 USD', status: 'Proposal', campaigns: 0, renewal: '—', color: '#9c6b8d' },
+  { initials: 'AA', name: 'Alma Active', contact: 'Sofía Mendoza', market: 'Both', plan: 'Signature', rent: '$1,200 USD/mo', status: 'Active', billing: 'Paid', nextCharge: 'Oct 08', color: '#ef3f52' },
+  { initials: 'NL', name: 'Nopal Lab', contact: 'Diego Chávez', market: 'México', plan: 'Growth', rent: '$8,490 MXN/mo', status: 'Active', billing: 'Paid', nextCharge: 'Sep 30', color: '#387c68' },
+  { initials: 'CN', name: 'Casa Norte', contact: 'Maya Brooks', market: 'USA', plan: 'Launch', rent: '$750 USD/mo', status: 'Onboarding', billing: 'Checkout open', nextCharge: 'Oct 01', color: '#23252b' },
+  { initials: 'MB', name: 'Marea Beauty', contact: 'Lucía Torres', market: 'Both', plan: 'Proposal', rent: '$1,680 USD/mo', status: 'Proposal', billing: 'Not started', nextCharge: '—', color: '#9c6b8d' },
 ];
 
 function GrowthMetric({ label, value, detail, accent }) {
@@ -207,33 +207,34 @@ function SociosDashboard({ market, notify }) {
     <section className="growth-dashboard">
       <div className="growth-disclaimer"><span>Concept preview</span> Sample partner accounts · CRM and campaign results proposed for Guillermo</div>
       <div className="growth-metrics">
-        <GrowthMetric label="Brand partners" value="12" detail="8 active · 4 in pipeline" accent="red" />
-        <GrowthMetric label="Contract value" value="$21.4K" detail="USD equivalent · active terms" />
-        <GrowthMetric label="Campaigns live" value="8" detail="5 USA · 6 México" accent="green" />
-        <GrowthMetric label="Renewal opportunity" value="$6.8K" detail="Next 30 days" accent="dark" />
+        <GrowthMetric label="Monthly recurring revenue" value="$8.9K" detail="USD equivalent · Stripe subscriptions" accent="red" />
+        <GrowthMetric label="Paying socios" value="8" detail="12 brand spaces contracted" />
+        <GrowthMetric label="Occupancy" value="72%" detail="USA + México monthly spaces" accent="green" />
+        <GrowthMetric label="Next 30 days" value="$6.8K" detail="Scheduled Stripe renewals" accent="dark" />
       </div>
 
       <div className="socios-layout">
         <section className="partner-directory">
-          <div className="growth-section-head compact"><div><span>Partner CRM</span><h2>Socios & prospects</h2></div><button onClick={() => notify('Partner filters opened')}>Filter <Icon name="chevron" size={13} /></button></div>
+          <div className="growth-section-head compact"><div><span>Monthly tenants</span><h2>Socios & subscriptions</h2></div><button onClick={() => notify('Partner filters opened')}>Filter <Icon name="chevron" size={13} /></button></div>
           <div className="partner-list">{partners.map((partner, index) => <button className={`partner-row ${index === 0 ? 'selected' : ''}`} key={partner.name} onClick={() => notify(`${partner.name} workspace opened`)}>
-            <span className="partner-logo" style={{ background: partner.color }}>{partner.initials}</span><span className="partner-identity"><strong>{partner.name}</strong><small>{partner.contact} · {partner.plan}</small></span><MarketLabel market={partner.market} /><span className={`partner-status ${partner.status.toLowerCase()}`}>{partner.status}</span><span className="partner-budget"><strong>{partner.budget}</strong><small>{partner.campaigns} campaign{partner.campaigns === 1 ? '' : 's'}</small></span><Icon name="chevron" size={15} />
+            <span className="partner-logo" style={{ background: partner.color }}>{partner.initials}</span><span className="partner-identity"><strong>{partner.name}</strong><small>{partner.contact} · {partner.plan}</small></span><MarketLabel market={partner.market} /><span className={`partner-status ${partner.status.toLowerCase()}`}>{partner.status}</span><span className="partner-budget"><strong>{partner.rent}</strong><small>{partner.billing} · next {partner.nextCharge}</small></span><Icon name="chevron" size={15} />
           </button>)}</div>
         </section>
 
         <aside className="partner-focus">
           <div className="focus-head"><span className="partner-logo large" style={{ background: featured.color }}>{featured.initials}</span><div><span>PARTNER SPOTLIGHT</span><h2>{featured.name}</h2><p>{featured.contact} · Brand lead</p></div><button onClick={() => notify('Socio workspace opened')}><Icon name="dots" /></button></div>
-          <div className="focus-plan"><div><span>Signature partner</span><strong>USA + México</strong></div><span className="partner-status active">Active</span></div>
+          <div className="focus-plan"><div><span>Signature monthly rental</span><strong>$1,200 USD / month · USA + México</strong></div><span className="partner-status active">Stripe active</span></div>
           <div className="focus-stats"><div><span>Impressions</span><strong>118.4K</strong><small>↑ 18.2%</small></div><div><span>Clicks</span><strong>3,420</strong><small>2.89% CTR</small></div><div><span>Attributed sales</span><strong>$6,840</strong><small>3.4× ROAS</small></div></div>
-          <div className="onboarding"><div><span>Campaign readiness</span><strong>4 / 5 complete</strong></div><div className="onboarding-track"><i /></div><ul><li className="done">Brand profile approved</li><li className="done">Stripe payment verified</li><li className="done">Creative assets delivered</li><li>Final homepage approval</li></ul></div>
-          <button className="focus-action" onClick={() => notify('Performance report opened')}>Open partner report <Icon name="arrow" size={16} /></button>
+          <div className="subscription-summary"><div><span>Subscription</span><strong>Active</strong></div><div><span>Last payment</span><strong>Sep 08 · Paid</strong></div><div><span>Next charge</span><strong>Oct 08 · $1,200</strong></div></div>
+          <div className="onboarding"><div><span>Space readiness</span><strong>4 / 5 complete</strong></div><div className="onboarding-track"><i /></div><ul><li className="done">Monthly rental agreement signed</li><li className="done">Stripe subscription active</li><li className="done">Brand profile approved</li><li>Final homepage approval</li></ul></div>
+          <button className="focus-action" onClick={() => notify('Stripe subscription opened')}>Manage Stripe subscription <Icon name="arrow" size={16} /></button>
         </aside>
       </div>
 
       <section className="partner-pipeline">
-        <div className="growth-section-head compact"><div><span>Sales pipeline</span><h2>From first contact to renewal</h2></div><strong>$13,230 potential revenue</strong></div>
+        <div className="growth-section-head compact"><div><span>Subscription pipeline</span><h2>From first contact to monthly tenant</h2></div><strong>$13,230 potential monthly revenue</strong></div>
         <div className="pipeline-stages">{[
-          ['New lead', '5', '$4.2K'], ['Proposal sent', '3', '$5.1K'], ['Stripe checkout', '2', '$2.4K'], ['Campaign live', '8', '$8.9K'], ['Renewal', '4', '$6.8K'],
+          ['New lead', '5', '$4.2K/mo'], ['Rental proposal', '3', '$5.1K/mo'], ['Stripe checkout', '2', '$2.4K/mo'], ['Space active', '8', '$8.9K MRR'], ['Next renewal', '4', '$6.8K'],
         ].map(([label, count, amount], index) => <div key={label}><span>{String(index + 1).padStart(2, '0')}</span><p>{label}</p><strong>{count}</strong><small>{amount}</small></div>)}</div>
       </section>
     </section>
@@ -563,7 +564,7 @@ export default function ProductControl() {
   const viewPresentation = activeView === 'Sponsors'
     ? { title: 'Sponsor revenue', eyebrow: 'DOSALGA MEDIA', subtitle: 'Sell premium brand visibility across Dosalga USA and México—with campaign inventory, creative approval and Stripe payments in one place.' }
     : activeView === 'Socios'
-      ? { title: 'Brand partners', eyebrow: 'DOSALGA PARTNERS', subtitle: 'Manage every advertiser relationship from first proposal to payment, live campaign performance and renewal.' }
+      ? { title: 'Socios subscriptions', eyebrow: 'DOSALGA PARTNERS', subtitle: 'Manage brands renting a monthly space on Dosalga USA, México or both—with recurring Stripe billing, visibility and renewals.' }
       : { title: activeView === 'Products' ? 'Product inventory' : activeView, eyebrow: 'DOSALGA COMMERCE', subtitle: 'One catalogue. Two markets. Every cost and margin under control.' };
 
   return (
@@ -623,7 +624,7 @@ export default function ProductControl() {
             <div className="title-row">
               <div><div className="eyebrow"><span /> {viewPresentation.eyebrow}</div><h1>{viewPresentation.title}</h1><p>{viewPresentation.subtitle}</p></div>
               {activeView === 'Sponsors' ? <div className="title-actions"><button className="btn secondary" onClick={() => notify('Stripe payments preview opened')}><Icon name="card" /> Stripe payments</button><button className="btn primary" onClick={() => notify('New campaign builder opened')}><Icon name="plus" /> New campaign</button></div>
-                : activeView === 'Socios' ? <div className="title-actions"><button className="btn secondary" onClick={() => notify('Partner pipeline opened')}><Icon name="chart" /> Pipeline</button><button className="btn primary" onClick={() => notify('Socio invitation created')}><Icon name="users" /> Invite socio</button></div>
+                : activeView === 'Socios' ? <div className="title-actions"><button className="btn secondary" onClick={() => notify('Stripe subscriptions opened')}><Icon name="card" /> Subscriptions</button><button className="btn primary" onClick={() => notify('Socio rental created')}><Icon name="users" /> New rental</button></div>
                   : <div className="title-actions"><button className="btn secondary" onClick={importWordPress} disabled={importingWp}><Icon name="upload" />{importingWp ? 'Importing...' : 'Import WP'}</button><button className="btn secondary" onClick={syncCj} disabled={syncing}><span className={syncing ? 'spin' : ''}><Icon name="refresh" /></span>{syncButtonLabel}</button><button className="btn primary" onClick={openNewProduct}><Icon name="plus" /> Add product</button></div>}
             </div>
 

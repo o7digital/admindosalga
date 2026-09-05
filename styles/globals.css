@@ -297,6 +297,12 @@ button.insight-row:hover { color: var(--red-dark); }
 .focus-stats span { color: #777a82; font-size: 7px; }
 .focus-stats strong { margin-top: 7px; font-size: 14px; }
 .focus-stats small { margin-top: 4px; color: #67c99d; font-size: 7px; }
+.subscription-summary { margin-top: 12px; display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid #2c2e33; }
+.subscription-summary > div { padding: 9px; border-right: 1px solid #2c2e33; }
+.subscription-summary > div:last-child { border-right: 0; }
+.subscription-summary span, .subscription-summary strong { display: block; }
+.subscription-summary span { color: #777a82; font-size: 7px; }
+.subscription-summary strong { margin-top: 5px; color: #f2f2f3; font-size: 8px; }
 .onboarding { margin-top: 17px; }
 .onboarding > div:first-child { display: flex; justify-content: space-between; font-size: 8px; color: #90939a; }
 .onboarding > div:first-child strong { color: white; }
