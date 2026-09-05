@@ -1,5 +1,11 @@
 import fs from 'fs/promises';
 import path from 'path';
+import {
+  archiveProduct as archiveDatabaseProduct,
+  databaseIsAvailable,
+  listProducts as listDatabaseProducts,
+  upsertProducts,
+} from '@/lib/productRepository';
 
 const dataFile = path.join(process.cwd(), 'data', 'products.json');
 
@@ -61,55 +67,66 @@ const buildProduct = (payload) => {
 };
 
 export default async function handler(req, res) {
-  if (req.method === 'GET') {
-    const products = await readProducts();
-    return res.status(200).json({ products });
-  }
-
-  if (req.method === 'POST') {
-    const products = await readProducts();
-    const product = buildProduct(req.body || {});
-    products.unshift(product);
-    await writeProducts(products);
-    return res.status(201).json({ product });
-  }
-
-  if (req.method === 'PUT') {
-    const products = await readProducts();
-    const incoming = buildProduct(req.body || {});
-    const index = products.findIndex((product) => product.id === incoming.id);
-
-    if (index === -1) {
-      return res.status(404).json({ message: 'Product not found' });
+  try {
+    if (req.method === 'GET') {
+      const products = databaseIsAvailable() ? await listDatabaseProducts() : await readProducts();
+      return res.status(200).json({ products, source: databaseIsAvailable() ? 'postgresql' : 'json' });
     }
 
-    products[index] = {
-      ...products[index],
-      ...incoming,
-      createdAt: products[index].createdAt,
-    };
-    await writeProducts(products);
-    return res.status(200).json({ product: products[index] });
-  }
-
-  if (req.method === 'DELETE') {
-    const products = await readProducts();
-    const { id } = req.query;
-    const index = products.findIndex((product) => product.id === id);
-
-    if (index === -1) {
-      return res.status(404).json({ message: 'Product not found' });
+    if (req.method === 'POST') {
+      const product = buildProduct(req.body || {});
+      if (databaseIsAvailable()) {
+        await upsertProducts([product]);
+      } else {
+        const products = await readProducts();
+        products.unshift(product);
+        await writeProducts(products);
+      }
+      return res.status(201).json({ product });
     }
 
-    products[index] = {
-      ...products[index],
-      archived: true,
-      status: 'archived',
-      updatedAt: new Date().toISOString(),
-    };
-    await writeProducts(products);
-    return res.status(200).json({ product: products[index] });
-  }
+    if (req.method === 'PUT') {
+      const incoming = buildProduct(req.body || {});
+      if (databaseIsAvailable()) {
+        const existing = (await listDatabaseProducts()).find((product) => product.id === incoming.id);
+        if (!existing) return res.status(404).json({ message: 'Product not found' });
+        const product = { ...existing, ...incoming, createdAt: existing.createdAt };
+        await upsertProducts([product]);
+        return res.status(200).json({ product });
+      }
 
-  return res.status(405).json({ message: 'Method not allowed' });
+      const products = await readProducts();
+      const index = products.findIndex((product) => product.id === incoming.id);
+      if (index === -1) return res.status(404).json({ message: 'Product not found' });
+      products[index] = { ...products[index], ...incoming, createdAt: products[index].createdAt };
+      await writeProducts(products);
+      return res.status(200).json({ product: products[index] });
+    }
+
+    if (req.method === 'DELETE') {
+      const { id } = req.query;
+      if (databaseIsAvailable()) {
+        const archived = await archiveDatabaseProduct(id);
+        if (!archived) return res.status(404).json({ message: 'Product not found' });
+        return res.status(200).json({ product: { id, archived: true, status: 'archived' } });
+      }
+
+      const products = await readProducts();
+      const index = products.findIndex((product) => product.id === id);
+      if (index === -1) return res.status(404).json({ message: 'Product not found' });
+      products[index] = {
+        ...products[index],
+        archived: true,
+        status: 'archived',
+        updatedAt: new Date().toISOString(),
+      };
+      await writeProducts(products);
+      return res.status(200).json({ product: products[index] });
+    }
+
+    return res.status(405).json({ message: 'Method not allowed' });
+  } catch (error) {
+    console.error('Products API failed:', error.message);
+    return res.status(500).json({ message: error.message || 'Product operation failed' });
+  }
 }

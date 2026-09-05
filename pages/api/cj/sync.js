@@ -1,4 +1,5 @@
 import { syncCjProduct } from '@/services/cjdropshipping';
+import { databaseIsAvailable, upsertProducts } from '@/lib/productRepository';
 
 const MAX_BATCH_SIZE = 4;
 
@@ -40,6 +41,10 @@ export default async function handler(req, res) {
       error: result.reason?.message || 'CJ sync failed',
     };
   });
+
+  if (databaseIsAvailable() && products.length) {
+    await upsertProducts(products);
+  }
 
   return res.status(200).json({
     syncedAt: new Date().toISOString(),

@@ -1,4 +1,5 @@
 import { importWordPressStores } from '@/services/wordpressStores';
+import { databaseIsAvailable, upsertProducts } from '@/lib/productRepository';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -7,12 +8,16 @@ export default async function handler(req, res) {
 
   try {
     const result = await importWordPressStores();
+    if (databaseIsAvailable()) {
+      await upsertProducts(result.products);
+    }
 
     return res.status(200).json({
       importedAt: result.importedAt,
       reports: result.reports,
       importedCount: result.products.length,
       products: result.products,
+      persisted: databaseIsAvailable(),
     });
   } catch (error) {
     return res.status(500).json({ message: error.message || 'WordPress import failed' });

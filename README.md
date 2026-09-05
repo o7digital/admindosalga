@@ -25,9 +25,25 @@ L'import d'un produit individuel récupère également les routes et coûts de l
 
 ## Donnees
 
-`data/products.json` fournit le catalogue initial. Les imports WooCommerce et les résultats
-de synchronisation CJ sont conservés dans le stockage local du navigateur afin de rester
-disponibles après rechargement sans tenter d'écrire dans le système de fichiers Vercel.
+Railway PostgreSQL est la source centrale lorsque `DATABASE_URL` est configurée. La connexion
+Vercel doit obligatoirement accepter TLS. Le PgBouncer du template ne doit être utilisé sur
+son URL publique qu'après activation de TLS; sinon `DATABASE_URL` pointe temporairement vers
+PostgreSQL direct avec un petit pool. `DATABASE_URL_NON_POOLING` sert aux migrations.
+`data/products.json` reste uniquement un
+fallback de développement lorsque la base n'est pas configurée. Le stockage local du
+navigateur est un cache et ne remplace plus les données PostgreSQL.
+
+Initialiser et vérifier la base:
+
+```bash
+npm run db:migrate
+npm run db:verify
+```
+
+L'endpoint `GET /api/health` confirme la connexion, le nombre de boutiques actives et le
+nombre de fiches produits. Les imports WooCommerce et les synchronisations CJ sont écrits
+dans PostgreSQL. Les deux WordPress restent les seules boutiques; Railway ne crée aucun
+WordPress supplémentaire.
 
 Champs principaux:
 - `cjCost`: cout produit chez CJ

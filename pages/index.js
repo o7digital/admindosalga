@@ -134,6 +134,7 @@ export default function ProductControl() {
   const loadProducts = async () => {
     const response = await fetch('/api/products');
     const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Products could not be loaded.');
     let cachedProducts = null;
 
     try {
@@ -143,7 +144,12 @@ export default function ProductControl() {
       cachedProducts = null;
     }
 
-    setProducts((cachedProducts || result.products || []).map(normalizeProduct));
+    const serverProducts = Array.isArray(result.products) ? result.products : [];
+    const nextProducts = result.source === 'postgresql'
+      ? serverProducts
+      : (cachedProducts || serverProducts);
+    setProducts(nextProducts.map(normalizeProduct));
+    if (result.source === 'postgresql') persistProducts(nextProducts);
   };
 
   const loadCjConnection = async () => {

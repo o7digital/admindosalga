@@ -4,3 +4,4 @@ node_modules
 .env.local
 data/products.local.json
 .vercel
+.sites-runtime
