@@ -413,6 +413,7 @@ export default function ProductControl() {
       competitorName,
       price: current.price ?? '',
       shippingCost: current.shippingCost ?? 0,
+      shippingIncluded: current.shippingIncluded ?? true,
       url: current.url || '',
     });
   };
@@ -430,6 +431,7 @@ export default function ProductControl() {
           competitorName: competitorEditor.competitorName,
           price: Number(competitorEditor.price),
           shippingCost: Number(competitorEditor.shippingCost || 0),
+          shippingIncluded: competitorEditor.shippingIncluded,
           url: competitorEditor.url,
         }),
       });
@@ -755,8 +757,9 @@ export default function ProductControl() {
                         <td className="number"><strong>{formatCurrency(product.salePrice, product.saleCurrency)}</strong><small>Store price</small></td>
                         {['Temu', 'Amazon'].map((competitorName) => {
                           const offer = product.competitors?.[competitorName.toLowerCase()];
-                          const difference = offer ? Number(product.salePrice) - Number(offer.price) : null;
-                          return <td key={competitorName} className="competitor-cell"><button type="button" onClick={() => openCompetitorEditor(product, competitorName)}><strong>{offer ? formatCurrency(offer.price, offer.currencyCode || product.saleCurrency) : '+ Add price'}</strong><small>{offer ? `${difference >= 0 ? '+' : ''}${formatCurrency(difference, product.saleCurrency)} vs ${competitorName}` : `Manual · ${marketFor(product)}`}</small></button></td>;
+                          const competitorTotal = offer ? Number(offer.price) + (offer.shippingIncluded ? 0 : Number(offer.shippingCost || 0)) : null;
+                          const difference = offer ? Number(product.salePrice) - competitorTotal : null;
+                          return <td key={competitorName} className="competitor-cell"><button type="button" onClick={() => openCompetitorEditor(product, competitorName)}><strong>{offer ? formatCurrency(offer.price, offer.currencyCode || product.saleCurrency) : '+ Add price'}</strong><small className={offer?.shippingIncluded ? 'included' : 'separate'}>{offer ? (offer.shippingIncluded ? '● Shipping included' : `○ + ${formatCurrency(offer.shippingCost, offer.currencyCode || product.saleCurrency)} shipping`) : `Manual · ${marketFor(product)}`}</small>{offer && <small>{`${difference >= 0 ? '+' : ''}${formatCurrency(difference, product.saleCurrency)} vs landed price`}</small>}</button></td>;
                         })}
                         <td><strong>{formatCurrency(product.shippingUsd, 'USD')}</strong><small className={product.shippingIncluded ? 'included' : 'separate'}>{product.shippingIncluded ? `● Included · FX ${product.exchangeRate}` : '○ Charged apart'}</small></td>
                         <td><strong className="route">{product.shippingOrigin} <span>→</span> {product.shippingDestination}</strong><small>{product.transportMethod} · {product.minDeliveryDays}-{product.maxDeliveryDays} days</small></td>
@@ -801,7 +804,8 @@ export default function ProductControl() {
               <div className="modal-head"><div><span>MANUAL MARKET PRICE · {marketFor(competitorEditor.product)}</span><h2>{competitorEditor.competitorName} comparison</h2></div><button type="button" onClick={() => setCompetitorEditor(null)} aria-label="Close"><Icon name="close" /></button></div>
               <div className="modal-body">
                 <div className="competitor-product"><ProductVisual product={competitorEditor.product} /><div><strong>{competitorEditor.product.name}</strong><span>{competitorEditor.product.sku} · Dosalga {formatCurrency(competitorEditor.product.salePrice, competitorEditor.product.saleCurrency)}</span></div></div>
-                <div className="form-grid"><label>{competitorEditor.competitorName} price ({competitorEditor.product.saleCurrency})<input required min="0" type="number" step="0.01" value={competitorEditor.price} onChange={(event) => setCompetitorEditor((current) => ({ ...current, price: event.target.value }))} /></label><label>Shipping ({competitorEditor.product.saleCurrency})<input min="0" type="number" step="0.01" value={competitorEditor.shippingCost} onChange={(event) => setCompetitorEditor((current) => ({ ...current, shippingCost: event.target.value }))} /></label></div>
+                <div className="form-grid"><label>{competitorEditor.competitorName} price ({competitorEditor.product.saleCurrency})<input required min="0" type="number" step="0.01" value={competitorEditor.price} onChange={(event) => setCompetitorEditor((current) => ({ ...current, price: event.target.value }))} /></label><label>Shipping mode<select value={competitorEditor.shippingIncluded ? 'included' : 'separate'} onChange={(event) => setCompetitorEditor((current) => ({ ...current, shippingIncluded: event.target.value === 'included' }))}><option value="included">Included in price</option><option value="separate">Charged separately</option></select></label></div>
+                {!competitorEditor.shippingIncluded && <label>Shipping price ({competitorEditor.product.saleCurrency})<input required min="0" type="number" step="0.01" value={competitorEditor.shippingCost} onChange={(event) => setCompetitorEditor((current) => ({ ...current, shippingCost: event.target.value }))} /></label>}
                 <label>Product link (optional)<input type="url" value={competitorEditor.url} onChange={(event) => setCompetitorEditor((current) => ({ ...current, url: event.target.value }))} placeholder={`https://${competitorEditor.competitorName.toLowerCase()}...`} /></label>
                 <p className="history-note">Every save creates a dated price snapshot in Railway. MX and US values remain separate.</p>
               </div>

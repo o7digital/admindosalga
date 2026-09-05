@@ -1,0 +1,2 @@
+ALTER TABLE competitor_offers
+  ADD COLUMN IF NOT EXISTS shipping_included BOOLEAN NOT NULL DEFAULT TRUE;

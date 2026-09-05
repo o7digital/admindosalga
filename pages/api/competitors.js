@@ -9,6 +9,7 @@ export default async function handler(req, res) {
     const competitorName = String(req.body?.competitorName || '').trim();
     const price = Number(req.body?.price);
     const shippingCost = Number(req.body?.shippingCost || 0);
+    const shippingIncluded = req.body?.shippingIncluded !== false;
     if (!externalId || !['temu', 'amazon'].includes(competitorName.toLowerCase())) {
       return res.status(400).json({ message: 'Product and competitor are required.' });
     }
@@ -21,6 +22,7 @@ export default async function handler(req, res) {
       competitorName,
       price,
       shippingCost,
+      shippingIncluded,
       url: String(req.body?.url || '').trim(),
     });
     if (!offer) return res.status(404).json({ message: 'Product listing not found.' });
