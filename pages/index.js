@@ -62,7 +62,7 @@ const iconPaths = {
 function Icon({ name, size = 19 }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d={iconPaths[name]} />
+      <path d={iconPaths[name] || ''} />
     </svg>
   );
 }
@@ -186,7 +186,7 @@ function SponsorsDashboard({ market, notify }) {
 
       <div className="growth-section-head"><div><span>Ad inventory</span><h2>Premium placements</h2></div><button onClick={() => notify('Placement inventory editor opened')}>Manage inventory <Icon name="arrow" size={14} /></button></div>
       <div className="placement-grid">
-        {placements.map((placement) => <article className={`placement-card ${placement.tone}`} key={placement.name}>
+        {placements.map((placement) => <article className={`placement-card ${placement.tone || ''}`} key={placement.name}>
           <div className="placement-visual"><span>AD</span><div><i /><i /><i /></div><b>{placement.name}</b></div>
           <div className="placement-body"><div><span>{placement.format}</span><MarketLabel market={placement.market} /></div><h3>{placement.name}</h3><p><strong>{placement.price}</strong> {placement.period}</p><footer><span><Icon name="eye" size={14} /> {placement.reach} est. views</span><em>{placement.availability}</em></footer></div>
         </article>)}
@@ -194,7 +194,7 @@ function SponsorsDashboard({ market, notify }) {
 
       <section className="growth-table-card">
         <div className="growth-section-head compact"><div><span>Campaign desk</span><h2>Bookings & creative approvals</h2></div><button onClick={() => notify('All sponsor campaigns opened')}>View all campaigns <Icon name="arrow" size={14} /></button></div>
-        <div className="growth-table-wrap"><table className="growth-table"><thead><tr><th>Brand</th><th>Campaign</th><th>Market</th><th>Flight</th><th>Investment</th><th>Stripe</th><th>Status</th><th>Performance</th></tr></thead><tbody>{campaigns.map((campaign) => <tr key={campaign.name}><td><div className="brand-cell"><span style={{ background: campaign.color }}>{campaign.brand}</span><strong>{campaign.name}</strong></div></td><td><strong>{campaign.campaign}</strong><small>{campaign.placement}</small></td><td><MarketLabel market={campaign.market} /></td><td>{campaign.dates}</td><td><strong>{campaign.amount}</strong></td><td><span className={`payment-pill ${campaign.payment.toLowerCase()}`}>{campaign.payment === 'Paid' ? '✓ ' : ''}{campaign.payment}</span></td><td><span className="campaign-status">{campaign.status}</span></td><td><strong>{campaign.performance}</strong></td></tr>)}</tbody></table></div>
+        <div className="growth-table-wrap"><table className="growth-table"><thead><tr><th>Brand</th><th>Campaign</th><th>Market</th><th>Flight</th><th>Investment</th><th>Stripe</th><th>Status</th><th>Performance</th></tr></thead><tbody>{campaigns.map((campaign) => <tr key={campaign.name}><td><div className="brand-cell"><span style={{ background: campaign.color }}>{campaign.brand}</span><strong>{campaign.name}</strong></div></td><td><strong>{campaign.campaign}</strong><small>{campaign.placement}</small></td><td><MarketLabel market={campaign.market} /></td><td>{campaign.dates}</td><td><strong>{campaign.amount}</strong></td><td><span className={`payment-pill ${(campaign.payment || '').toLowerCase()}`}>{campaign.payment === 'Paid' ? '✓ ' : ''}{campaign.payment || 'Pending'}</span></td><td><span className="campaign-status">{campaign.status}</span></td><td><strong>{campaign.performance}</strong></td></tr>)}</tbody></table></div>
       </section>
     </section>
   );
