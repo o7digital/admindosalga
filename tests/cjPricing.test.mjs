@@ -35,7 +35,7 @@ test('validated proposals have server-owned status and timestamp, with explicit 
 });
 
 test('invalid price, currency, shipping and ETA are rejected', () => {
-  for (const price of [0, -1, NaN, Infinity, '', null, true, '20', 100000000]) {
+  for (const price of [0, 0.001, -1, NaN, Infinity, '', null, true, '20', 100000000]) {
     assert.throws(() => validateCjPriceProposal({ ...draft, price }));
   }
   for (const shippingIncluded of [undefined, null, 'false', 1]) {
