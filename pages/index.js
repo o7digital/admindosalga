@@ -1,4 +1,5 @@
 import Head from 'next/head';
+import CjPriceCell from '@/components/CjPriceCell';
 import { useEffect, useMemo, useState } from 'react';
 import { UserButton } from '@clerk/nextjs';
 import { calculateProductMargin, formatCurrency, formatPercent } from '@/lib/margins';
@@ -447,6 +448,15 @@ export default function ProductControl() {
     }
   };
 
+  const savePriceProposal = (productId, proposal) => {
+    setProducts((current) => {
+      const next = current.map((product) => product.id === productId ? { ...product, cjPriceProposal: proposal } : product);
+      persistProducts(next);
+      return next;
+    });
+    notify('Price proposal saved · not published to CJ or store');
+  };
+
   const saveProduct = async (event) => {
     event.preventDefault();
     setError('');
@@ -570,16 +580,17 @@ export default function ProductControl() {
     const importedProducts = (result.products || []).map(normalizeProduct);
     setProducts(importedProducts);
     persistProducts(importedProducts);
+    if (result.persisted) await loadProducts();
     const summary = (result.reports || []).map((report) => `${report.name}: ${report.count}`).join(' · ');
     notify(`WordPress import completed · ${summary}`);
   };
 
   const exportCsv = () => {
     const rows = [
-      ['Product', 'Product URL', 'Image', 'SKU Dosalga', 'SKU/PID CJ', 'Brand', 'Category', 'Store', 'Currency', 'CJ cost USD', 'Sale price', 'Shipping included', 'Shipping USD', 'Exchange rate', 'Origin', 'Destination', 'Method', 'ETA min', 'ETA max', 'Stock', 'Status', 'Net margin', 'Margin percent', 'Last CJ sync'],
+      ['Product', 'Product URL', 'Image', 'SKU Dosalga', 'SKU/PID CJ', 'Brand', 'Category', 'Store', 'Currency', 'CJ cost USD', 'Sale price', 'Shipping included', 'Shipping USD', 'Exchange rate', 'Origin', 'Destination', 'Method', 'ETA min', 'ETA max', 'Stock', 'Status', 'Net margin', 'Margin percent', 'Last CJ sync', 'CJ proposed price', 'CJ proposal currency', 'CJ proposal shipping included', 'CJ proposal ETA min', 'CJ proposal ETA max', 'CJ proposal status'],
       ...filtered.map((product) => {
         const margin = calculateProductMargin(product);
-        return [product.name, product.productUrl, product.imageUrl, product.sku, product.cjSku || product.pid, product.brand, product.category, marketFor(product), margin.saleCurrency, product.cjCostUsd, product.salePrice, product.shippingIncluded ? 'yes' : 'no', product.shippingUsd, product.exchangeRate, product.shippingOrigin, product.shippingDestination, product.transportMethod, product.minDeliveryDays, product.maxDeliveryDays, product.stock, product.status, margin.profit.toFixed(2), formatPercent(margin.marginRate), product.lastCjSyncAt || ''];
+        return [product.name, product.productUrl, product.imageUrl, product.sku, product.cjSku || product.pid, product.brand, product.category, marketFor(product), margin.saleCurrency, product.cjCostUsd, product.salePrice, product.shippingIncluded ? 'yes' : 'no', product.shippingUsd, product.exchangeRate, product.shippingOrigin, product.shippingDestination, product.transportMethod, product.minDeliveryDays, product.maxDeliveryDays, product.stock, product.status, margin.profit.toFixed(2), formatPercent(margin.marginRate), product.lastCjSyncAt || '', product.cjPriceProposal?.price ?? '', product.cjPriceProposal?.currency || '', product.cjPriceProposal ? (product.cjPriceProposal.shippingIncluded ? 'yes' : 'no') : '', product.cjPriceProposal?.minDeliveryDays ?? '', product.cjPriceProposal?.maxDeliveryDays ?? '', product.cjPriceProposal ? 'Draft - not published' : ''];
       }),
     ];
     const csv = rows.map((row) => row.map((cell) => `"${String(cell ?? '').replaceAll('"', '""')}"`).join(',')).join('\n');
@@ -744,7 +755,7 @@ export default function ProductControl() {
               </div>
               <div className="table-wrap">
                 <table>
-                  <thead><tr><th className="product-col">Product / brand</th><th>Store</th><th>Currency</th><th>CJ cost USD</th><th>Sale price</th><th>Temu</th><th>Amazon</th><th>Shipping USD</th><th>Route & ETA</th><th>Stock</th><th>Margin</th><th>Sync</th><th /></tr></thead>
+                  <thead><tr><th className="product-col">Product / brand</th><th>Store</th><th>Currency</th><th>CJ cost USD</th><th>Sale price</th><th>Update price CJ</th><th>Temu</th><th>Amazon</th><th>Shipping USD</th><th>Route & ETA</th><th>Stock</th><th>Margin</th><th>Sync</th><th /></tr></thead>
                   <tbody>{pageProducts.map((product) => {
                     const margin = calculateProductMargin(product);
                     const percent = Math.round(margin.marginRate * 100);
@@ -755,6 +766,7 @@ export default function ProductControl() {
                         <td><span className="currency-pill">{product.saleCurrency}</span></td>
                         <td className="number"><strong>{formatCurrency(product.cjCostUsd, 'USD')}</strong><small>{product.cjSku || product.pid}</small></td>
                         <td className="number"><strong>{formatCurrency(product.salePrice, product.saleCurrency)}</strong><small>Store price</small></td>
+                        <CjPriceCell key={`${product.id}-${product.saleCurrency}-${product.cjPriceProposal?.savedAt || 'new'}`} product={product} onSaved={savePriceProposal} disabled={syncing || importingWp} />
                         {['Temu', 'Amazon'].map((competitorName) => {
                           const offer = product.competitors?.[competitorName.toLowerCase()];
                           const competitorTotal = offer ? Number(offer.price) + (offer.shippingIncluded ? 0 : Number(offer.shippingCost || 0)) : null;
@@ -769,7 +781,7 @@ export default function ProductControl() {
                         <td><button className="row-menu" onClick={() => openEditProduct(product)} aria-label={`Edit ${product.name}`}><Icon name="dots" /></button></td>
                       </tr>
                     );
-                  })}{!pageProducts.length && <tr><td colSpan={13} className="empty">No products match these filters.</td></tr>}</tbody>
+                  })}{!pageProducts.length && <tr><td colSpan={14} className="empty">No products match these filters.</td></tr>}</tbody>
                 </table>
               </div>
               <footer className="table-footer"><span>Showing {pageProducts.length} of {filtered.length} products</span><div><button disabled={page === 1} onClick={() => setPage(page - 1)}>←</button>{Array.from({ length: totalPages }).slice(0, 5).map((_, index) => <button key={index + 1} className={page === index + 1 ? 'page-active' : ''} onClick={() => setPage(index + 1)}>{index + 1}</button>)}<button disabled={page === totalPages} onClick={() => setPage(page + 1)}>→</button></div></footer>

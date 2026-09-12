@@ -23,6 +23,31 @@ n'est envoyé au navigateur. `CJ_ACCESS_TOKEN` peut aussi être utilisé tempora
 La synchronisation catalogue récupère les coûts et les stocks par lots de quatre produits.
 L'import d'un produit individuel récupère également les routes et coûts de livraison.
 
+## Prix proposés CJ (US / MX)
+
+La colonne « Update price CJ » permet de saisir un prix de vente proposé dans la devise
+de la fiche, de préciser si la livraison est incluse et de confirmer les délais min/max.
+La suggestion vise 35 % de marge : coût produit et livraison incluse, convertis avec le
+taux de la fiche, divisés par (1 − 35 % − frais plateforme − taxes configurées), arrondis
+au centime supérieur. Sans coût CJ, ou sans coût de livraison lorsqu'elle est incluse,
+la suggestion reste indisponible ; la saisie manuelle reste possible. Le taux de change
+et les délais existants sont des estimations à vérifier, pas des données temps réel.
+
+Les propositions sont enregistrées dans PostgreSQL (`store_listings.metadata.cjPriceProposal`)
+via `PUT /api/cj/price-proposal`, par fiche et par marché. Les imports WooCommerce et
+synchronisations CJ les préservent. Elles figurent également dans l'export CSV.
+Le bouton enregistre un brouillon : il ne modifie ni le prix actuel ni CJ ni WooCommerce.
+
+La [documentation CJ Shop](https://developers.cjdropshipping.com/en/api/api2/api/shop.html)
+documente `saveProduct` et `saveVariantBatch` pour enregistrer les produits/prix de boutique
+dans CJ. Elle ne garantit pas une publication de ces changements vers WooCommerce.
+Une future publication nécessite les identifiants vérifiés boutique/produit/variation et
+les accès WooCommerce en écriture ; l'intégration actuelle utilise son API publique en lecture.
+Le backend US fait déjà l'objet d'une correction de devise à l'import : cette incohérence
+devra être résolue avant toute écriture de prix. Aucun endpoint CJ non documenté n'est utilisé.
+
+Vérification des calculs et validations : `node --test tests/cjPricing.test.mjs`.
+
 ## Donnees
 
 Railway PostgreSQL est la source centrale lorsque `DATABASE_URL` est configurée. La connexion

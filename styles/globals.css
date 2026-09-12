@@ -113,6 +113,21 @@ td > strong, .number strong { color: #292b30; font-size: 10px; white-space: nowr
 td small { margin-top: 5px; color: #96989d; font-size: 8px; white-space: nowrap; }
 .competitor-cell button { border: 1px solid #e4e1dc; background: #fff; border-radius: 7px; padding: 8px 9px; text-align: left; min-width: 108px; }
 .competitor-cell button:hover { border-color: #aaa59e; background: #faf9f7; }
+.cj-price-cell { min-width: 224px; background: #fcfaf7; }
+.cj-price-cell form { width: 210px; }
+.cj-price-cell fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 7px; }
+.cj-price-cell label { display: grid; gap: 4px; font-size: 10px; color: #56595e; }
+.cj-price-cell input[type="number"] { width: 100%; min-width: 0; border: 1px solid #d8d4ce; border-radius: 5px; padding: 7px; background: white; color: #292b30; font: inherit; }
+.cj-price-cell .cj-shipping-choice { display: flex; align-items: center; gap: 5px; }
+.cj-shipping-choice input { accent-color: var(--green); }
+.cj-eta { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.cj-price-cell small { white-space: normal; line-height: 1.4; margin-top: 0; font-size: 9px; }
+.cj-price-cell .cj-price-note { margin-top: 6px; color: #77736d; }
+.cj-suggestion { border: 0; padding: 0; background: transparent; text-align: left; color: #276d55; font-size: 10px; cursor: pointer; }
+.cj-save { border: 1px solid #c9d9cf; border-radius: 5px; background: #edf4ef; padding: 7px; color: #276d55; font-size: 10px; font-weight: 700; cursor: pointer; }
+.cj-price-cell button:disabled { opacity: .6; cursor: default; }
+.cj-price-cell input:focus-visible, .cj-price-cell button:focus-visible { outline: 2px solid #276d55; outline-offset: 2px; }
+.cj-price-cell p { font-size: 10px; line-height: 1.4; }
 .competitor-cell button strong { color: #24262a; font-size: 9px; }
 .competitor-cell button small { margin-top: 4px; color: #8c8f94; font-size: 7px; }
 .product-cell { display: flex; align-items: center; gap: 11px; }
