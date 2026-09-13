@@ -312,3 +312,14 @@ export const syncCjProduct = async (product, { includeFreight = false } = {}) =>
     changes,
   };
 };
+
+export const getCjShopProduct = async (shopId, productId) => {
+  const response = await cjRequest('/shop/product/queryDetail', { query: { shopId, platformProductIds: productId } });
+  return (Array.isArray(response.data) ? response.data : []).find(item => String(item.shopId) === String(shopId) && String(item.platformProductId) === String(productId)) || null;
+};
+
+export const saveCjShopVariants = async (shopId, variants) => {
+  const response = await cjRequest('/store/product/saveVariantBatch', { method: 'POST', body: { shopId, variants } });
+  const results = Array.isArray(response.data) ? response.data : [];
+  return { requestId: response.requestId, results };
+};

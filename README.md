@@ -105,3 +105,19 @@ motifs et actions, classés comme le tableau. Hugging Face reçoit les totaux et
 La clé existante reste côté serveur. Une erreur, un délai dépassé (25 s) ou une réponse
 invalide est signalé explicitement avec un rapport de règles disponible en secours.
 Tests : `node --test tests/*.test.mjs`.
+
+## Envoi des prix vers CJ
+
+Après sauvegarde, « Review & send to CJ » vérifie le hostname de la boutique autorisée,
+la devise, le produit et toutes ses variantes via l'API CJ. La confirmation indique
+explicitement que le prix saisi sera envoyé à toutes les variantes listées.
+`POST /api/cj/publish-price` utilise exclusivement le brouillon enregistré côté serveur.
+Un verrou PostgreSQL bloque les envois concurrents et les répétitions du même brouillon.
+Les résultats partiels et les réponses incertaines ne sont jamais affichés comme publiés.
+Les états et identifiants de requête sont conservés dans `cjPricePublication`.
+
+L'endpoint CJ `saveVariantBatch` enregistre le prix de boutique dans CJ. La livraison
+incluse et les délais restent des notes de l'admin : cet endpoint n'applique pas de
+règles WooCommerce de livraison. L'acceptation CJ ne prouve pas la propagation WooCommerce.
+Seul un prix public de produit simple relu dans la même devise peut être marqué vérifié ;
+les produits variables restent en attente de vérification. Le produit gelé est refusé.
