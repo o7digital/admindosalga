@@ -114,8 +114,17 @@ const callHuggingFace = async (summary) => {
         },
       ],
       temperature: 0.2,
-      max_tokens: 700,
-      response_format: { type: 'json_object' },
+      max_tokens: 1200,
+      response_format: { type: 'json_schema', json_schema: {
+        name: 'olivia_report', strict: true, schema: {
+          type: 'object', additionalProperties: false,
+          properties: {
+            title: { type: 'string' }, executiveSummary: { type: 'string' },
+            priorities: { type: 'array', items: { type: 'string' } },
+            recommendations: { type: 'array', items: { type: 'string' } },
+          }, required: ['title', 'executiveSummary', 'priorities', 'recommendations'],
+        },
+      } },
     }),
   });
 
