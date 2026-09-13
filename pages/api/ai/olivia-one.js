@@ -43,7 +43,7 @@ const summarizeDashboard = (products) => {
       lowMargin: lowMargin.length,
       negativeMargin: negativeMargin.length,
       lowStock: lowStock.length,
-      shippingAlerts: shippingAlerts.length,
+      shippingAlerts: auditCatalogue(products).filter(item => item.issues.some(issue => ['missing-shipping', 'slow-shipping', 'invalid-eta'].includes(issue.code))).length,
       linkedToCj,
       unlinkedToCj: active.length - linkedToCj,
       cjChanges,
@@ -102,7 +102,7 @@ const callHuggingFace = async (summary) => {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: process.env.HUGGINGFACE_MODEL || 'Qwen/Qwen2.5-7B-Instruct-1M',
+      model: process.env.HUGGINGFACE_MODEL || 'meta-llama/Llama-3.3-70B-Instruct:together',
       messages: [
         {
           role: 'system',
