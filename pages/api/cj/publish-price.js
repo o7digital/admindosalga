@@ -40,7 +40,7 @@ export default async function handler(req, res) {
       } });
     }
     const wooCurrent = await wooProduct(identity);
-    if (wooCurrent.sku !== product.sku || wooCurrent.is_purchasable === false) throw new Error('WooCommerce SKU mismatch or product not purchasable.');
+    if ((wooCurrent.sku && wooCurrent.sku !== product.sku) || wooCurrent.is_purchasable === false) throw new Error('WooCommerce SKU mismatch or product not purchasable.');
     if (req.method === 'GET') return res.status(200).json({ shop: shop.name, price: proposal.price, currency: proposal.currency, savedAt: proposal.savedAt, variants: variants.map(v => ({ id: v.id, sku: v.sku, title: v.title })), message: 'This price will be written to the CJ product and every variant, then to WooCommerce. Shipping inclusion and ETA remain admin notes.' });
     if (req.body?.savedAt !== proposal.savedAt || req.body?.confirmAllVariants !== true) throw new Error('Review the current proposal and confirm all variants first.');
     operation = await beginCjPublication(productId, proposal.savedAt);
