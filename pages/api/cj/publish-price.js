@@ -26,7 +26,15 @@ export default async function handler(req, res) {
     if (!proposal) throw new Error('Save a price proposal first.');
     const shop = selectShop(await getCjShops(), identity);
     const detail = await getCjShopProduct(shop.id, identity.productId);
-    const variants = publicationVariants(detail, identity, proposal);
+    let variants;
+    try { variants = publicationVariants(detail, identity, proposal); }
+    catch (error) {
+      return res.status(409).json({ message: error.message, details: {
+        shopCurrency: shop.currencyCode, productCurrency: detail?.platformProductPricesCurrency || null,
+        variantCurrencies: [...new Set((detail?.variants || []).map(v => v.priceCurrency || null))],
+        variantCount: detail?.variants?.length || 0,
+      } });
+    }
     const woo = await wooProduct(identity);
     if (woo.sku !== product.sku || woo.is_purchasable === false) throw new Error('WooCommerce SKU mismatch or product not purchasable.');
     if (req.method === 'GET') return res.status(200).json({ shop: shop.name, price: proposal.price, currency: proposal.currency, savedAt: proposal.savedAt, variants: variants.map(v => ({ id: v.id, sku: v.sku, title: v.title })), message: 'This price will apply to every listed variant. Shipping inclusion and ETA remain admin notes; this CJ endpoint changes only the price.' });
