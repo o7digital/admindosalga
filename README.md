@@ -123,4 +123,6 @@ L'endpoint CJ `saveProduct` puis `saveVariantBatch` enregistre le prix du produi
 toutes ses variantes dans CJ. La livraison incluse et les délais restent des notes de
 l'admin. L'API REST WooCommerce met ensuite à jour le prix du produit simple ou de toutes
 les variations. L'état `woo_verified` n'est enregistré qu'après confirmation de chaque prix.
-Le produit gelé est refusé.
+Le statut public WooCommerce est vérifié avant toute écriture : un produit brouillon,
+masqué ou non achetable y est refusé. Un ancien statut « off shelf » dans CJ ne bloque
+pas la mise à jour, car `saveProduct` sert précisément à réenregistrer la fiche active.

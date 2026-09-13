@@ -16,7 +16,7 @@ test('variant price payload uses store identities and matching currency only', (
  assert.equal(variants[0].id, 'v1');
  assert.throws(() => publicationVariants(detail, identity, { currency: 'USD', price: 300 }));
  assert.throws(() => publicationVariants({ ...detail, variants: [] }, identity, { currency: 'MXN' }));
- assert.throws(() => publicationVariants({ ...detail, shopProductStatus: 3 }, identity, { currency: 'MXN' }));
+ assert.equal(publicationVariants({ ...detail, shopProductStatus: 3 }, identity, { currency: 'MXN', price: 300 }).length, 1);
  assert.equal(allVariantsAccepted(variants, []), false);
  assert.equal(allVariantsAccepted(variants, [{ id: 'v1', productId: '123', saveSuccess: false }]), false);
  assert.equal(allVariantsAccepted(variants, [{ id: 'v1', productId: '123', saveSuccess: true }]), true);
