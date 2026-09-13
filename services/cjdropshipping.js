@@ -318,6 +318,14 @@ export const getCjShopProduct = async (shopId, productId) => {
   return (Array.isArray(response.data) ? response.data : []).find(item => String(item.shopId) === String(shopId) && String(item.platformProductId) === String(productId)) || null;
 };
 
+export const saveCjShopProduct = async (shopId, product) => {
+  const response = await cjRequest('/store/product/saveProduct', {
+    method: 'POST',
+    body: { ...product, shopId },
+  });
+  return { requestId: response.requestId, saved: response.data === true || response.result === true };
+};
+
 export const saveCjShopVariants = async (shopId, variants) => {
   const response = await cjRequest('/store/product/saveVariantBatch', { method: 'POST', body: { shopId, variants } });
   const results = Array.isArray(response.data) ? response.data : [];

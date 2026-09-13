@@ -64,7 +64,7 @@ export default function CjPriceCell({ product, onSaved, disabled }) {
       <button type="submit" className="cj-save" disabled={unchanged}>{saving ? 'Saving…' : unchanged ? 'Draft saved' : 'Save proposal'}</button>
     </fieldset>
     <small className="cj-price-note" role="status">{unchanged ? (publication?.proposalSavedAt === saved.savedAt ? 'Publication status below' : 'Saved in admin · ready for CJ review') : 'Draft · confirm delivery estimates before saving'}</small>
-    {unchanged && <button className="cj-save" type="button" disabled={saving || disabled || publication?.proposalSavedAt === saved.savedAt || ['sending', 'unknown'].includes(publication?.state)} onClick={() => publish(false)}>Review & send to CJ</button>}
+    {unchanged && <button className="cj-save" type="button" disabled={saving || disabled || publication?.proposalSavedAt === saved.savedAt || ['sending', 'unknown', 'woo_verified'].includes(publication?.state)} onClick={() => publish(false)}>Review & publish CJ + WooCommerce</button>}
     {review && unchanged && <div className="cj-price-note"><strong>{review.shop} · {formatCurrency(review.price, review.currency)}</strong><p>{review.message}</p><ul>{review.variants.map(v => <li key={v.id}>{v.sku} · {v.title}</li>)}</ul><button type="button" className="cj-save" disabled={saving || disabled} onClick={() => publish(true)}>Confirm price for all {review.variants.length} variants</button><button type="button" disabled={saving} onClick={() => setReview(null)}>Cancel</button></div>}
     {publication && <p role="status" className="cj-price-note">{publication.message || 'CJ publication in progress; do not resend.'}</p>}
     {saved && <small>Saved {new Date(saved.savedAt).toLocaleString()}</small>}

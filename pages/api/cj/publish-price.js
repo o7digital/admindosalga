@@ -1,5 +1,6 @@
 import { databaseIsAvailable, listProducts, beginCjPublication, finishCjPublication } from '@/lib/productRepository';
-import { getCjShops, getCjShopProduct, saveCjShopVariants } from '@/services/cjdropshipping';
+import { getCjShops, getCjShopProduct, saveCjShopProduct, saveCjShopVariants } from '@/services/cjdropshipping';
+import { hasWooWriteCredentials, publishWooPrice } from '@/services/woocommerce';
 import { listingIdentity, selectShop, publicationVariants, allVariantsAccepted } from '@/lib/cjPublication.mjs';
 
 export const config = { maxDuration: 60 };
@@ -24,6 +25,9 @@ export default async function handler(req, res) {
     const identity = listingIdentity(product);
     const proposal = product.cjPriceProposal;
     if (!proposal) throw new Error('Save a price proposal first.');
+    if (req.method === 'POST' && !hasWooWriteCredentials(identity.market)) {
+      throw new Error(`WooCommerce ${identity.market} write credentials are missing. Configure WOOCOMMERCE_${identity.market}_CONSUMER_KEY and WOOCOMMERCE_${identity.market}_CONSUMER_SECRET before publishing; no CJ write was attempted.`);
+    }
     const shop = selectShop(await getCjShops(), identity);
     const detail = await getCjShopProduct(shop.id, identity.productId);
     let variants;
@@ -35,29 +39,37 @@ export default async function handler(req, res) {
         variantCount: detail?.variants?.length || 0,
       } });
     }
-    const woo = await wooProduct(identity);
-    if (woo.sku !== product.sku || woo.is_purchasable === false) throw new Error('WooCommerce SKU mismatch or product not purchasable.');
-    if (req.method === 'GET') return res.status(200).json({ shop: shop.name, price: proposal.price, currency: proposal.currency, savedAt: proposal.savedAt, variants: variants.map(v => ({ id: v.id, sku: v.sku, title: v.title })), message: 'This price will apply to every listed variant. Shipping inclusion and ETA remain admin notes; this CJ endpoint changes only the price.' });
+    const wooCurrent = await wooProduct(identity);
+    if (wooCurrent.sku !== product.sku || wooCurrent.is_purchasable === false) throw new Error('WooCommerce SKU mismatch or product not purchasable.');
+    if (req.method === 'GET') return res.status(200).json({ shop: shop.name, price: proposal.price, currency: proposal.currency, savedAt: proposal.savedAt, variants: variants.map(v => ({ id: v.id, sku: v.sku, title: v.title })), message: 'This price will be written to the CJ product and every variant, then to WooCommerce. Shipping inclusion and ETA remain admin notes.' });
     if (req.body?.savedAt !== proposal.savedAt || req.body?.confirmAllVariants !== true) throw new Error('Review the current proposal and confirm all variants first.');
     operation = await beginCjPublication(productId, proposal.savedAt);
     if (!operation) return res.status(409).json({ message: 'Another publication is running or the proposal changed. Reload before retrying.' });
+    const cjProduct = await saveCjShopProduct(shop.id, {
+      id: identity.productId,
+      title: detail.platformProductTitle || detail.title || product.name,
+      image: detail.platformProductImage || detail.image || product.imageUrl,
+      description: detail.platformProductDescription || detail.description || '',
+      priceMin: proposal.price,
+      priceMax: proposal.price,
+      priceCurrency: proposal.currency,
+    });
+    if (!cjProduct.saved) throw new Error('CJ did not confirm the product price save. No variant prices were sent.');
     sent = true;
     const cj = await saveCjShopVariants(shop.id, variants);
     const accepted = allVariantsAccepted(variants, cj.results);
-    let state = accepted ? 'cj_accepted_woo_pending' : 'cj_partial_or_rejected';
-    let message = accepted ? 'CJ accepted the prices. WooCommerce publication has not yet been verified.' : 'CJ did not confirm every variant. Review CJ before retrying.';
+    let state = accepted ? 'cj_accepted' : 'cj_partial_or_rejected';
+    let message = accepted ? 'CJ accepted the product and all variant prices.' : 'CJ did not confirm every variant. Review CJ before retrying.';
     let wooVerified = false;
+    let wooResult = null;
     if (accepted) {
-      try {
-        const current = await wooProduct(identity);
-        const prices = current.prices;
-        // A range/variable product needs per-variant verification; never infer success from the lowest price.
-        wooVerified = current.type === 'simple' && prices?.currency_code === proposal.currency
-          && Number(prices.price) / (10 ** Number(prices.currency_minor_unit)) === proposal.price;
-        if (wooVerified) { state = 'woo_verified'; message = 'CJ accepted the price and the current WooCommerce price matches.'; }
-      } catch { /* Keep the explicit pending state. */ }
+      wooResult = await publishWooPrice(identity, proposal.price);
+      wooVerified = wooResult.updated.length > 0 && wooResult.updated.every(item => Number(item.price) === Number(proposal.price));
+      if (!wooVerified) throw new Error('WooCommerce did not confirm the new price on every product/variation.');
+      state = 'woo_verified';
+      message = `CJ and WooCommerce updated successfully (${woo.updated.length} price${woo.updated.length === 1 ? '' : 's'}).`;
     }
-    const publication = { state, message, at: new Date().toISOString(), proposalSavedAt: proposal.savedAt, price: proposal.price, currency: proposal.currency, shopId: shop.id, variantCount: variants.length, requestId: cj.requestId || null, wooVerified };
+    const publication = { state, message, at: new Date().toISOString(), proposalSavedAt: proposal.savedAt, price: proposal.price, currency: proposal.currency, shopId: shop.id, variantCount: variants.length, requestId: cj.requestId || cjProduct.requestId || null, wooVerified, wooUpdated: wooResult?.updated?.length || 0 };
     await finishCjPublication(productId, operation, publication);
     return res.status(200).json({ publication });
   } catch (error) {

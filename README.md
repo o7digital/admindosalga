@@ -40,9 +40,12 @@ Le bouton enregistre un brouillon : il ne modifie ni le prix actuel ni CJ ni Woo
 
 La [documentation CJ Shop](https://developers.cjdropshipping.com/en/api/api2/api/shop.html)
 documente `saveProduct` et `saveVariantBatch` pour enregistrer les produits/prix de boutique
-dans CJ. Elle ne garantit pas une publication de ces changements vers WooCommerce.
-Une future publication nécessite les identifiants vérifiés boutique/produit/variation et
-les accès WooCommerce en écriture ; l'intégration actuelle utilise son API publique en lecture.
+dans CJ. La publication écrit ensuite dans WooCommerce via son API REST et vérifie chaque
+produit ou variation.
+Configurer côté Vercel les quatre variables secrètes `WOOCOMMERCE_MX_CONSUMER_KEY`,
+`WOOCOMMERCE_MX_CONSUMER_SECRET`, `WOOCOMMERCE_US_CONSUMER_KEY` et
+`WOOCOMMERCE_US_CONSUMER_SECRET`. Sans ces accès, le bouton bloque avant l'écriture CJ
+pour éviter un prix différent entre CJ et WooCommerce.
 Le backend US fait déjà l'objet d'une correction de devise à l'import : cette incohérence
 devra être résolue avant toute écriture de prix. Aucun endpoint CJ non documenté n'est utilisé.
 
@@ -108,7 +111,7 @@ Tests : `node --test tests/*.test.mjs`.
 
 ## Envoi des prix vers CJ
 
-Après sauvegarde, « Review & send to CJ » vérifie le hostname de la boutique autorisée,
+Après sauvegarde, « Review & publish CJ + WooCommerce » vérifie le hostname de la boutique autorisée,
 la devise, le produit et toutes ses variantes via l'API CJ. La confirmation indique
 explicitement que le prix saisi sera envoyé à toutes les variantes listées.
 `POST /api/cj/publish-price` utilise exclusivement le brouillon enregistré côté serveur.
@@ -116,8 +119,8 @@ Un verrou PostgreSQL bloque les envois concurrents et les répétitions du même
 Les résultats partiels et les réponses incertaines ne sont jamais affichés comme publiés.
 Les états et identifiants de requête sont conservés dans `cjPricePublication`.
 
-L'endpoint CJ `saveVariantBatch` enregistre le prix de boutique dans CJ. La livraison
-incluse et les délais restent des notes de l'admin : cet endpoint n'applique pas de
-règles WooCommerce de livraison. L'acceptation CJ ne prouve pas la propagation WooCommerce.
-Seul un prix public de produit simple relu dans la même devise peut être marqué vérifié ;
-les produits variables restent en attente de vérification. Le produit gelé est refusé.
+L'endpoint CJ `saveProduct` puis `saveVariantBatch` enregistre le prix du produit et de
+toutes ses variantes dans CJ. La livraison incluse et les délais restent des notes de
+l'admin. L'API REST WooCommerce met ensuite à jour le prix du produit simple ou de toutes
+les variations. L'état `woo_verified` n'est enregistré qu'après confirmation de chaque prix.
+Le produit gelé est refusé.
