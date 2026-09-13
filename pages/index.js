@@ -767,7 +767,7 @@ export default function ProductControl() {
                         <td><span className={`market-badge ${marketFor(product) === 'USA' ? 'usa' : 'mexico'}`}>{marketFor(product) !== 'Both' && <span className={`flag ${marketFor(product) === 'USA' ? 'us' : 'mx'}`} />}{marketFor(product)}</span></td>
                         <td><span className="currency-pill">{product.saleCurrency}</span></td>
                         <td className="number"><strong>{formatCurrency(product.cjCostUsd, 'USD')}</strong><small>{product.cjSku || product.pid}</small></td>
-                        <td className="number"><strong>{formatCurrency(product.salePrice, product.saleCurrency)}</strong><small>{product.priceNormalization === 'woo-mx-usd-v1' ? `Converted USD → MXN · FX ${product.exchangeRate}` : 'Store price'}</small></td>
+                        <td className="number"><strong>{formatCurrency(product.salePrice, product.saleCurrency)}</strong><small>{product.priceNormalization === 'woo-mx-confirmed-usd-v2' ? `Woo source: ${formatCurrency(product.sourceSalePriceUsd, 'USD')} · FX ${product.exchangeRate}` : `Woo price · ${product.saleCurrency}`}</small></td>
                         <CjPriceCell key={`${product.id}-${product.saleCurrency}-${product.cjPriceProposal?.savedAt || 'new'}`} product={product} onSaved={savePriceProposal} disabled={syncing || importingWp} />
                         {['Temu', 'Amazon'].map((competitorName) => {
                           const offer = product.competitors?.[competitorName.toLowerCase()];
