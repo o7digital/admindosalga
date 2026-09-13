@@ -60,3 +60,32 @@ export const publishWooPrice = async (identity, price) => {
 
   return { productType: product.type || 'simple', updated: updatedVariations };
 };
+
+export const freezeWooProduct = async (identity, expectedSku = '') => {
+  const path = `/products/${encodeURIComponent(identity.productId)}`;
+  const current = await request(identity.market, path);
+  const wooSku = String(current.sku || '').trim();
+  const dashboardSku = String(expectedSku || '').trim();
+
+  if (wooSku && dashboardSku && wooSku !== dashboardSku) {
+    throw new Error(`WooCommerce SKU mismatch: expected ${dashboardSku}, received ${wooSku}. No change was made.`);
+  }
+
+  const alreadyFrozen = current.status === 'draft' && current.catalog_visibility === 'hidden';
+  const updated = alreadyFrozen ? current : await request(identity.market, path, {
+    method: 'PUT',
+    body: JSON.stringify({ status: 'draft', catalog_visibility: 'hidden' }),
+  });
+
+  if (updated.status !== 'draft' || updated.catalog_visibility !== 'hidden') {
+    throw new Error('WooCommerce did not confirm that the product is draft and hidden.');
+  }
+
+  return {
+    productId: String(updated.id),
+    sku: updated.sku || dashboardSku,
+    status: updated.status,
+    catalogVisibility: updated.catalog_visibility,
+    alreadyFrozen,
+  };
+};

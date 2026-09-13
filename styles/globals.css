@@ -156,6 +156,13 @@ td small { margin-top: 5px; color: #96989d; font-size: 8px; white-space: nowrap;
 .status.review::before { background: #d9974a; }
 .status.low-stock { color: #bb3a43 !important; }
 .status.low-stock::before { background: #d95c63; }
+.status.blocked { color: #a51927 !important; font-weight: 800; }
+.status.blocked::before { background: #c82333; }
+.block-sale-button, .sale-blocked-badge { display: block; width: max-content; margin-top: 7px; border-radius: 4px; padding: 5px 8px; font-size: 8px; font-weight: 800; }
+.block-sale-button { border: 1px solid #d86b73; background: #fff; color: #a51927; cursor: pointer; }
+.block-sale-button:hover { background: #a51927; color: #fff; }
+.block-sale-button:disabled { opacity: .55; cursor: wait; }
+.sale-blocked-badge { color: #fff !important; background: #a51927; }
 .market-badge { display: inline-flex; align-items: center; gap: 5px; padding: 5px 7px; border: 1px solid #e5e2de; color: #5c5f64; border-radius: 4px; font-size: 8px; font-weight: 700; white-space: nowrap; }
 .market-badge .flag { width: 12px; height: 8px; }
 .currency-pill { display: inline-block; padding: 4px 6px; background: #f0f0ee; color: #56595e; font-size: 8px; font-weight: 800; }

@@ -267,6 +267,7 @@ export default function ProductControl() {
   const [error, setError] = useState('');
   const [competitorEditor, setCompetitorEditor] = useState(null);
   const [savingCompetitor, setSavingCompetitor] = useState(false);
+  const [blockingProductId, setBlockingProductId] = useState('');
   const clerkEnabled = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
 
   const persistProducts = (nextProducts) => {
@@ -482,6 +483,26 @@ export default function ProductControl() {
     await fetch(`/api/products?id=${encodeURIComponent(product.id)}`, { method: 'DELETE' });
     await loadProducts();
     notify('Product archived');
+  };
+
+  const blockProductSale = async (product) => {
+    setError('');
+    setBlockingProductId(product.id);
+    try {
+      const response = await fetch('/api/woocommerce/block-sale', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ productId: product.id }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || 'The product could not be blocked.');
+      await loadProducts();
+      notify('Vente bloquée · produit masqué dans WooCommerce');
+    } catch (blockError) {
+      setError(blockError.message || 'The product could not be blocked.');
+    } finally {
+      setBlockingProductId('');
+    }
   };
 
   const importCj = async () => {
@@ -768,7 +789,7 @@ export default function ProductControl() {
                     const audit = productAudit(product);
                     return (
                       <tr key={product.id} className={audit.critical ? 'price-alert-row' : ''}>
-                        <td><div className="product-cell"><ProductVisual product={product} /><div><strong>{product.productUrl ? <a href={product.productUrl} target="_blank" rel="noreferrer">{product.name}</a> : product.name}</strong><span>{product.brand} · {product.sku}</span><small className={`status ${product.status === 'paused' || product.status === 'review' ? 'review' : product.stock <= 10 ? 'low-stock' : ''}`}>{product.status}</small>{audit.issues.length > 0 && <small className="product-alert-reason">⚠ {audit.issues[0].message}</small>}</div></div></td>
+                        <td><div className="product-cell"><ProductVisual product={product} /><div><strong>{product.productUrl ? <a href={product.productUrl} target="_blank" rel="noreferrer">{product.name}</a> : product.name}</strong><span>{product.brand} · {product.sku}</span><small className={`status ${product.wooFrozen ? 'blocked' : product.status === 'paused' || product.status === 'review' ? 'review' : product.stock <= 10 ? 'low-stock' : ''}`}>{product.wooFrozen ? 'Bloqué dans WooCommerce' : product.status}</small>{audit.issues.length > 0 && <small className="product-alert-reason">⚠ {audit.issues[0].message}</small>}{product.wooFrozen ? <span className="sale-blocked-badge">⛔ Vente bloquée</span> : <button type="button" className="block-sale-button" disabled={blockingProductId === product.id} onClick={() => blockProductSale(product)}>{blockingProductId === product.id ? 'Blocage…' : 'Bloquer la vente'}</button>}</div></div></td>
                         <td><span className={`market-badge ${marketFor(product) === 'USA' ? 'usa' : 'mexico'}`}>{marketFor(product) !== 'Both' && <span className={`flag ${marketFor(product) === 'USA' ? 'us' : 'mx'}`} />}{marketFor(product)}</span></td>
                         <td><span className="currency-pill">{product.saleCurrency}</span></td>
                         <td className="number"><strong>{formatCurrency(product.cjCostUsd, 'USD')}</strong><small>{product.cjSku || product.pid}</small></td>
