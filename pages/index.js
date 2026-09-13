@@ -1,3 +1,4 @@
+import { productAudit, compareProductPriority } from '@/lib/productAlerts.mjs';
 import { normalizeWooPrice } from '@/lib/wooPricing.mjs';
 import Head from 'next/head';
 import CjPriceCell from '@/components/CjPriceCell';
@@ -327,7 +328,7 @@ export default function ProductControl() {
     const marginMatch = marginFilter === 'All margins' || (marginFilter === 'Under 35%' ? margin < 0.35 : margin >= 0.35);
     const searchMatch = !q || `${product.name} ${product.brand} ${product.sku} ${product.cjSku}`.toLowerCase().includes(q);
     return marketMatch && categoryMatch && shippingMatch && marginMatch && searchMatch;
-  }), [category, marginFilter, market, products, query, shippingFilter]);
+  }).sort(compareProductPriority), [category, marginFilter, market, products, query, shippingFilter]);
 
   useEffect(() => setPage(1), [category, marginFilter, market, query, shippingFilter]);
 
@@ -607,15 +608,17 @@ export default function ProductControl() {
   const runOliviaOne = async () => {
     setOliviaLoading(true);
     setError('');
-    const response = await fetch('/api/ai/olivia-one', { method: 'POST' });
-    const result = await response.json();
-    setOliviaLoading(false);
-    if (!response.ok) {
-      setError(result.message || 'Olivia One analysis failed.');
-      return;
+    try {
+      const response = await fetch('/api/ai/olivia-one', { method: 'POST' });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || 'Olivia One analysis failed.');
+      setOliviaReport(result);
+      notify(`Olivia One analysis ready · ${result.mode}`);
+    } catch (failure) {
+      setError(failure.message);
+    } finally {
+      setOliviaLoading(false);
     }
-    setOliviaReport(result);
-    notify(`Olivia One analysis ready · ${result.mode}`);
   };
 
   const isGrowthWorkspace = activeView === 'Sponsors' || activeView === 'Socios';
@@ -732,7 +735,8 @@ export default function ProductControl() {
 
             {activeView === 'Reporting IA' && (
               <section className="mockup-board">
-                <article className="mockup-panel wide"><h2>Olivia One</h2><p>AI analyst for the full Dosalga dashboard: products, margins, shipping, CJ connection, sponsors, socios and reporting readiness.</p><button className="btn primary report-action" onClick={runOliviaOne} disabled={oliviaLoading}><Icon name="refresh" /> {oliviaLoading ? 'Analyzing...' : 'Run Olivia One'}</button>{oliviaReport && <div className="ai-report"><strong>{oliviaReport.analysis.title}</strong><p>{oliviaReport.analysis.executiveSummary}</p>{oliviaReport.analysis.priorities?.map((item) => <div key={item} className="kanban-row"><span>{item}</span><em>Priority</em></div>)}</div>}</article>
+                <article className="mockup-panel wide"><h2>Olivia One</h2><p>AI analyst for the full Dosalga dashboard: products, margins, shipping, CJ connection, sponsors, socios and reporting readiness.</p><button className="btn primary report-action" onClick={runOliviaOne} disabled={oliviaLoading}><Icon name="refresh" /> {oliviaLoading ? 'Analyzing...' : 'Run Olivia One'}</button>{oliviaReport && <div className="ai-report"><p>{oliviaReport.mode === 'huggingface' ? 'Hugging Face · AI analysis' : 'Rule-based audit · AI unavailable'} · {oliviaReport.source} · {oliviaReport.summary.totals.products} products</p>{oliviaReport.providerError && <p role="status">{oliviaReport.providerError}</p>}<strong>{oliviaReport.analysis.title}</strong><p>{oliviaReport.analysis.executiveSummary}</p>{oliviaReport.analysis.priorities?.map((item) => <div key={item} className="kanban-row"><span>{item}</span><em>Priority</em></div>)}</div>}</article>
+                {oliviaReport && <article className="mockup-panel wide"><h2>All anomalies · highest priority first ({oliviaReport.summary.anomalies.length})</h2><p>Amounts compared in USD. A currency mismatch requires verification, never automatic conversion.</p>{oliviaReport.summary.anomalies.map(item => <div className={`audit-item ${item.critical ? 'critical' : ''}`} key={item.id}><button onClick={() => { setActiveView('Products'); setMarket('All'); setCategory('All categories'); setShippingFilter('All shipping'); setMarginFilter('All margins'); setQuery(item.sku || item.name); setPage(1); }}>{item.sku} · {item.name}</button><p>{item.siteId} · Store {formatCurrency(item.salePrice, item.currency)} ≈ {formatCurrency(item.saleUsd, 'USD')} · CJ {formatCurrency(item.costUsd, 'USD')}</p>{item.issues.map(issue => <p key={issue.code}><strong>{issue.message}</strong> — {issue.action}</p>)}</div>)}</article>}
                 <article className="mockup-panel"><h2>AI queue</h2><div className="kanban-row"><span>Products to push in ads</span><strong>{marginSummary.best.length}</strong><em>Ready</em></div><div className="kanban-row"><span>Low margin warnings</span><strong>{marginSummary.low.length}</strong><em>Review</em></div><div className="kanban-row"><span>Shipping risk alerts</span><strong>{routeSummary.reduce((sum, route) => sum + route.alerts, 0)}</strong><em>Open</em></div></article>
                 <article className="mockup-panel"><h2>Recommendations</h2>{oliviaReport ? oliviaReport.analysis.recommendations?.map((item) => <p key={item}>{item}</p>) : <p>Run Olivia One to generate operational recommendations from the current dashboard data.</p>}</article>
               </section>
@@ -753,21 +757,23 @@ export default function ProductControl() {
                 <label className="select-wrap"><select value={category} onChange={(event) => setCategory(event.target.value)}>{categories.map((item) => <option key={item}>{item}</option>)}</select><Icon name="chevron" size={15} /></label>
                 <label className="select-wrap"><select value={shippingFilter} onChange={(event) => setShippingFilter(event.target.value)}><option>All shipping</option><option>Included</option><option>Separate</option></select><Icon name="chevron" size={15} /></label>
                 <label className="select-wrap"><select value={marginFilter} onChange={(event) => setMarginFilter(event.target.value)}><option>All margins</option><option>Under 35%</option><option>35% and up</option></select><Icon name="chevron" size={15} /></label>
-                <span className="result-count">{filtered.length} shown</span>
+                <span className="result-count">{filtered.length} shown · Priority first</span>
               </div>
               <div className="table-wrap">
                 <table>
-                  <thead><tr><th className="product-col">Product / brand</th><th>Store</th><th>Currency</th><th>CJ cost USD</th><th>Sale price</th><th>Update price CJ</th><th>Temu</th><th>Amazon</th><th>Shipping USD</th><th>Route & ETA</th><th>Stock</th><th>Margin</th><th>Sync</th><th /></tr></thead>
+                  <thead><tr><th className="product-col">Product / brand</th><th>Store</th><th>Currency</th><th>CJ cost USD</th><th>Shipping USD</th><th>Sale price</th><th>Update price CJ</th><th>Temu</th><th>Amazon</th><th>Route & ETA</th><th>Stock</th><th>Margin</th><th>Sync</th><th /></tr></thead>
                   <tbody>{pageProducts.map((product) => {
                     const margin = calculateProductMargin(product);
                     const percent = Math.round(margin.marginRate * 100);
+                    const audit = productAudit(product);
                     return (
-                      <tr key={product.id}>
-                        <td><div className="product-cell"><ProductVisual product={product} /><div><strong>{product.productUrl ? <a href={product.productUrl} target="_blank" rel="noreferrer">{product.name}</a> : product.name}</strong><span>{product.brand} · {product.sku}</span><small className={`status ${product.status === 'paused' || product.status === 'review' ? 'review' : product.stock <= 10 ? 'low-stock' : ''}`}>{product.status}</small></div></div></td>
+                      <tr key={product.id} className={audit.critical ? 'price-alert-row' : ''}>
+                        <td><div className="product-cell"><ProductVisual product={product} /><div><strong>{product.productUrl ? <a href={product.productUrl} target="_blank" rel="noreferrer">{product.name}</a> : product.name}</strong><span>{product.brand} · {product.sku}</span><small className={`status ${product.status === 'paused' || product.status === 'review' ? 'review' : product.stock <= 10 ? 'low-stock' : ''}`}>{product.status}</small>{audit.issues.length > 0 && <small className="product-alert-reason">⚠ {audit.issues[0].message}</small>}</div></div></td>
                         <td><span className={`market-badge ${marketFor(product) === 'USA' ? 'usa' : 'mexico'}`}>{marketFor(product) !== 'Both' && <span className={`flag ${marketFor(product) === 'USA' ? 'us' : 'mx'}`} />}{marketFor(product)}</span></td>
                         <td><span className="currency-pill">{product.saleCurrency}</span></td>
                         <td className="number"><strong>{formatCurrency(product.cjCostUsd, 'USD')}</strong><small>{product.cjSku || product.pid}</small></td>
-                        <td className="number"><strong>{formatCurrency(product.salePrice, product.saleCurrency)}</strong><small>{product.priceNormalization === 'woo-mx-confirmed-usd-v2' ? `Woo source: ${formatCurrency(product.sourceSalePriceUsd, 'USD')} · FX ${product.exchangeRate}` : `Woo price · ${product.saleCurrency}`}</small></td>
+                        <td><strong>{Number(product.shippingUsd) > 0 ? formatCurrency(product.shippingUsd, 'USD') : 'Not confirmed'}</strong><small>{product.shippingDestination} · {product.minDeliveryDays}-{product.maxDeliveryDays} days</small></td>
+                        <td className="number"><strong>{formatCurrency(product.salePrice, product.saleCurrency)}</strong>{product.saleCurrency === 'MXN' && <small className="usd-equivalent">≈ {formatCurrency(audit.saleUsd, 'USD')} · FX {product.exchangeRate}</small>}<small className={product.shippingIncluded ? 'included' : 'separate'}>{product.shippingIncluded === true ? '● Shipping included in sale price' : product.shippingIncluded === false ? '○ Shipping charged separately' : 'Shipping inclusion unconfirmed'}</small><small>{product.priceNormalization === 'woo-mx-confirmed-usd-v2' ? `Woo source: ${formatCurrency(product.sourceSalePriceUsd, 'USD')} · FX ${product.exchangeRate}` : `Woo price · ${product.saleCurrency}`}</small></td>
                         <CjPriceCell key={`${product.id}-${product.saleCurrency}-${product.cjPriceProposal?.savedAt || 'new'}`} product={product} onSaved={savePriceProposal} disabled={syncing || importingWp} />
                         {['Temu', 'Amazon'].map((competitorName) => {
                           const offer = product.competitors?.[competitorName.toLowerCase()];
@@ -775,7 +781,6 @@ export default function ProductControl() {
                           const difference = offer ? Number(product.salePrice) - competitorTotal : null;
                           return <td key={competitorName} className="competitor-cell"><button type="button" onClick={() => openCompetitorEditor(product, competitorName)}><strong>{offer ? formatCurrency(offer.price, offer.currencyCode || product.saleCurrency) : '+ Add price'}</strong><small className={offer?.shippingIncluded ? 'included' : 'separate'}>{offer ? (offer.shippingIncluded ? '● Shipping included' : `○ + ${formatCurrency(offer.shippingCost, offer.currencyCode || product.saleCurrency)} shipping`) : `Manual · ${marketFor(product)}`}</small>{offer && <small>{`${difference >= 0 ? '+' : ''}${formatCurrency(difference, product.saleCurrency)} vs landed price`}</small>}</button></td>;
                         })}
-                        <td><strong>{formatCurrency(product.shippingUsd, 'USD')}</strong><small className={product.shippingIncluded ? 'included' : 'separate'}>{product.shippingIncluded ? `● Included · FX ${product.exchangeRate}` : '○ Charged apart'}</small></td>
                         <td><strong className="route">{product.shippingOrigin} <span>→</span> {product.shippingDestination}</strong><small>{product.transportMethod} · {product.minDeliveryDays}-{product.maxDeliveryDays} days</small></td>
                         <td><strong className={product.stock <= 10 ? 'danger-text' : ''}>{product.stock}</strong><small>{product.stock <= 10 ? 'Low stock' : 'Available'}</small></td>
                         <td><div className={`margin-ring ${percent < 35 ? 'warning' : ''}`} style={{ '--margin': `${Math.max(0, Math.min(100, percent)) * 3.6}deg` }}><span>{percent}%</span></div><small>{formatCurrency(margin.profit, margin.saleCurrency)}</small></td>

@@ -87,3 +87,21 @@ Champs principaux:
 - `shippingCost`: cout shipping si non inclus
 - `platformFeeRate`: frais plateforme en pourcentage
 - `taxRate`: taxe estimee en pourcentage
+
+## Alertes prix et Olivia One
+
+Le tableau classe les fiches par priorité avant pagination. Les prix sont comparés
+après conversion dans une même devise (USD, taux configuré sur la fiche). Une ligne
+rouge signale un prix sous le coût CJ, une perte après transport/frais ou un prix
+au moins cinq fois supérieur au coût CJ (écart à vérifier, pas une erreur prouvée).
+Les devises ne sont jamais modifiées par les alertes. Le transport figure près du
+coût CJ ; zéro importé est affiché comme non confirmé. Le prix MXN affiche son
+équivalent USD et les conditions de livraison enregistrées.
+
+Olivia One lit PostgreSQL quand configuré, et uniquement le JSON de développement
+sinon. Le rapport retourne toutes les fiches avec anomalies, leurs SKU, montants,
+motifs et actions, classés comme le tableau. Hugging Face reçoit les totaux et les
+30 fiches prioritaires pour rédiger la synthèse ; le rapport détaillé reste exhaustif.
+La clé existante reste côté serveur. Une erreur, un délai dépassé (25 s) ou une réponse
+invalide est signalé explicitement avec un rapport de règles disponible en secours.
+Tests : `node --test tests/*.test.mjs`.

@@ -434,3 +434,14 @@ button.insight-row:hover { color: var(--red-dark); }
   .metrics { grid-template-columns: 1fr; }
   h1 { font-size: 28px; }
 }
+
+.price-alert-row > td { background: #fff0f0 !important; border-top-color: #efb9b9; }
+.price-alert-row:hover > td { background: #ffe4e4 !important; }
+.price-alert-row > td:first-child { border-left: 4px solid #c82333; }
+.price-alert-row .number > strong, .price-alert-row .product-alert-reason { color: #b01828; }
+.product-cell .product-alert-reason { white-space: normal; max-width: 245px; line-height: 1.5; font-size: 10px; }
+.number .usd-equivalent { font-size: 11px; font-weight: 700; color: #30343a; }
+.audit-item { padding: 15px; margin: 12px 0; border: 1px solid #ddd; border-radius: 6px; }
+.audit-item.critical { background: #fff0f0; border-color: #df9c9c; }
+.audit-item button { border: 0; background: none; text-align: left; font-weight: 700; color: #a51927; cursor: pointer; }
+.audit-item p { line-height: 1.5; }
