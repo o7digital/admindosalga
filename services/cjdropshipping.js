@@ -97,6 +97,14 @@ const cjRequest = async (path, { method = 'GET', query, body } = {}) => {
   });
 };
 
+export const getCjShops = async () => {
+  const response = await cjRequest('/shop/getShops');
+  return (Array.isArray(response.data) ? response.data : []).map(shop => ({
+    id: shop.id, name: shop.name, type: shop.type, status: shop.status,
+    countryCode: shop.countryCode, currencyCode: shop.currencyCode,
+  }));
+};
+
 const extractIdentifier = (input = '') => {
   const raw = String(input || '').trim();
   if (!raw) return '';
