@@ -50,6 +50,13 @@ Vérification des calculs et validations : `node --test tests/cjPricing.test.mjs
 
 ## Donnees
 
+Le catalogue WooCommerce MX stocke les montants de vente en USD malgré le code MXN
+renvoyé par son API. L'admin les convertit en MXN avec le taux de la fiche :
+23,58 × 17,49 = 412,41 MXN. Cette correction s'applique aux nouvelles importations
+et à la lecture des anciennes fiches. Le marqueur `priceNormalization` évite une
+double conversion lors des sauvegardes et synchronisations. Les propositions saisies
+en MXN restent dans cette devise. Vérification : `node --test tests/wooPricing.test.mjs`.
+
 Railway PostgreSQL est la source centrale lorsque `DATABASE_URL` est configurée. La connexion
 Vercel doit obligatoirement accepter TLS. Le PgBouncer du template ne doit être utilisé sur
 son URL publique qu'après activation de TLS; sinon `DATABASE_URL` pointe temporairement vers

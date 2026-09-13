@@ -1,3 +1,4 @@
+import { normalizeWooPrice } from '@/lib/wooPricing.mjs';
 import fs from 'fs/promises';
 import path from 'path';
 import {
@@ -44,6 +45,7 @@ const buildProduct = (payload) => {
     cjCostCurrency: payload.cjCostCurrency || saleCurrency,
     salePrice: Number(payload.salePrice) || 0,
     saleCurrency,
+    priceNormalization: payload.priceNormalization || 'local-currency',
     exchangeRate: Number(payload.exchangeRate) || 17.49,
     shippingIncluded: Boolean(payload.shippingIncluded),
     shippingCost: Number(payload.shippingCost) || 0,
@@ -70,7 +72,7 @@ export default async function handler(req, res) {
   try {
     if (req.method === 'GET') {
       const products = databaseIsAvailable() ? await listDatabaseProducts() : await readProducts();
-      return res.status(200).json({ products, source: databaseIsAvailable() ? 'postgresql' : 'json' });
+      return res.status(200).json({ products: products.map(normalizeWooPrice), source: databaseIsAvailable() ? 'postgresql' : 'json' });
     }
 
     if (req.method === 'POST') {

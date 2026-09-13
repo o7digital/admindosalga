@@ -1,3 +1,5 @@
+import { normalizeWooPrice } from '../lib/wooPricing.mjs';
+
 const storeSources = [
   {
     id: 'dosalga-mexico',
@@ -129,7 +131,7 @@ export const importWordPressStores = async () => {
     const products = await fetchStoreProducts(source);
     return {
       source,
-      products: products.map((product) => mapWooProduct(product, source)),
+      products: products.map((product) => normalizeWooPrice(mapWooProduct(product, source))),
     };
   }));
 
