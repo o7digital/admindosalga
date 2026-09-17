@@ -253,6 +253,8 @@ function SociosDashboard({ market, notify }) {
 
 export default function ProductControl() {
   const [products, setProducts] = useState([]);
+  const [orders, setOrders] = useState([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
   const [activeView, setActiveView] = useState('Products');
   const [market, setMarket] = useState('All');
   const [query, setQuery] = useState('');
@@ -321,6 +323,26 @@ export default function ProductControl() {
     });
   }, []);
 
+  const loadOrders = async () => {
+    setOrdersLoading(true);
+    setError('');
+    try {
+      const response = await fetch('/api/orders', { cache: 'no-store' });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || 'WooCommerce orders could not be loaded.');
+      setOrders(result.orders || []);
+      if (result.errors?.length) notify(`Orders loaded with warning · ${result.errors.join(' · ')}`);
+    } catch (loadError) {
+      setError(loadError.message);
+    } finally {
+      setOrdersLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeView === 'Orders') loadOrders();
+  }, [activeView]);
+
   const categories = useMemo(() => ['All categories', ...new Set(products.map((product) => product.category).filter(Boolean))], [products]);
 
   const filtered = useMemo(() => products.filter((product) => {
@@ -388,6 +410,18 @@ export default function ProductControl() {
     const changes = filtered.reduce((sum, product) => sum + (product.cjChangeReport?.length || 0), 0);
     return { linked, synced, changes, unlinked: filtered.length - linked };
   }, [filtered]);
+
+  const visibleOrders = useMemo(() => orders.filter((order) => (
+    market === 'All' || (market === 'México' ? order.market === 'MX' : order.market === 'US')
+  )), [market, orders]);
+
+  const orderSummary = useMemo(() => ({
+    revenueMx: visibleOrders.filter((order) => order.currency === 'MXN').reduce((sum, order) => sum + order.total, 0),
+    revenueUs: visibleOrders.filter((order) => order.currency === 'USD').reduce((sum, order) => sum + order.total, 0),
+    profitMx: visibleOrders.filter((order) => order.currency === 'MXN').reduce((sum, order) => sum + order.estimatedProfit, 0),
+    profitUs: visibleOrders.filter((order) => order.currency === 'USD').reduce((sum, order) => sum + order.estimatedProfit, 0),
+    unmatched: visibleOrders.reduce((sum, order) => sum + order.unmatchedItems, 0),
+  }), [visibleOrders]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const pageProducts = filtered.slice((page - 1) * pageSize, page * pageSize);
@@ -677,6 +711,7 @@ export default function ProductControl() {
             {[
               ['Overview', 'grid'],
               ['Products', 'box'],
+              ['Orders', 'card'],
               ['Shipping', 'truck'],
               ['Margins', 'chart'],
             ].map(([label, icon]) => (
@@ -721,10 +756,11 @@ export default function ProductControl() {
               <div><div className="eyebrow"><span /> {viewPresentation.eyebrow}</div><h1>{viewPresentation.title}</h1><p>{viewPresentation.subtitle}</p></div>
               {activeView === 'Sponsors' ? <div className="title-actions"><button className="btn secondary" onClick={() => notify('Stripe payments preview opened')}><Icon name="card" /> Stripe payments</button><button className="btn primary" onClick={() => notify('New campaign builder opened')}><Icon name="plus" /> New campaign</button></div>
                 : activeView === 'Socios' ? <div className="title-actions"><button className="btn secondary" onClick={() => notify('Stripe subscriptions opened')}><Icon name="card" /> Subscriptions</button><button className="btn primary" onClick={() => notify('Socio rental created')}><Icon name="users" /> New rental</button></div>
-                  : <div className="title-actions"><button className="btn secondary" onClick={importWordPress} disabled={importingWp}><Icon name="upload" />{importingWp ? 'Importing...' : 'Import WP'}</button><button className="btn secondary" onClick={syncCj} disabled={syncing}><span className={syncing ? 'spin' : ''}><Icon name="refresh" /></span>{syncButtonLabel}</button><button className="btn primary" onClick={openNewProduct}><Icon name="plus" /> Add product</button></div>}
+                  : activeView === 'Orders' ? <div className="title-actions"><button className="btn primary" onClick={loadOrders} disabled={ordersLoading}><Icon name="refresh" /> {ordersLoading ? 'Loading…' : 'Refresh Woo orders'}</button></div>
+                    : <div className="title-actions"><button className="btn secondary" onClick={importWordPress} disabled={importingWp}><Icon name="upload" />{importingWp ? 'Importing...' : 'Import WP'}</button><button className="btn secondary" onClick={syncCj} disabled={syncing}><span className={syncing ? 'spin' : ''}><Icon name="refresh" /></span>{syncButtonLabel}</button><button className="btn primary" onClick={openNewProduct}><Icon name="plus" /> Add product</button></div>}
             </div>
 
-            {!isGrowthWorkspace && <div className="metrics">
+            {!isGrowthWorkspace && activeView !== 'Orders' && <div className="metrics">
               <article><span>Active products</span><div className="metric-line"><strong>{metrics.active}</strong></div><small>Across both stores</small></article>
               <article><span>Average margin</span><div className="metric-line"><strong>{formatPercent(metrics.averageMargin)}</strong></div><small>After included shipping</small></article>
               <article><span>Shipping included</span><div className="metric-line"><strong>{metrics.active ? Math.round((metrics.included / metrics.active) * 100) : 0}%</strong></div><small>{metrics.included} of {metrics.active} products</small><div className="progress"><i style={{ width: `${metrics.active ? (metrics.included / metrics.active) * 100 : 0}%` }} /></div></article>
@@ -750,6 +786,21 @@ export default function ProductControl() {
                 <article><h2>Low margin</h2>{marginSummary.low.slice(0, 8).map(({ product, margin }) => <button key={product.id} className="insight-row" onClick={() => openEditProduct(product)}><span>{product.name}</span><strong>{formatPercent(margin.marginRate)}</strong></button>)}</article>
                 <article><h2>Best margin</h2>{marginSummary.best.map(({ product, margin }) => <button key={product.id} className="insight-row" onClick={() => openEditProduct(product)}><span>{product.name}</span><strong>{formatCurrency(margin.profit, margin.saleCurrency)}</strong></button>)}</article>
                 <article><h2>Negative margin</h2><div className="big-number">{marginSummary.negative.length}</div><p>Products selling below landed cost in the current filters.</p></article>
+              </section>
+            )}
+
+            {activeView === 'Orders' && (
+              <section className="catalog-card compact-card">
+                <div className="metrics">
+                  <article><span>WooCommerce orders</span><div className="metric-line"><strong>{visibleOrders.length}</strong></div><small>Latest orders · {market}</small></article>
+                  <article><span>Customer revenue</span><div className="metric-line"><strong>{formatCurrency(orderSummary.revenueMx, 'MXN')}</strong></div><small>{formatCurrency(orderSummary.revenueUs, 'USD')} · Woo totals</small></article>
+                  <article><span>Estimated profit</span><div className="metric-line"><strong>{formatCurrency(orderSummary.profitMx, 'MXN')}</strong></div><small>{formatCurrency(orderSummary.profitUs, 'USD')} · after CJ costs</small></article>
+                  <article className={orderSummary.unmatched ? 'attention-card' : ''}><span>Unmatched lines</span><div className="metric-line"><strong>{orderSummary.unmatched}</strong></div><small>SKU must match a dashboard product</small></article>
+                </div>
+                <div className="table-wrap"><table><thead><tr><th>Woo order</th><th>Store</th><th>Customer</th><th>Status</th><th>Items / CJ link</th><th>Total</th><th>CJ estimated cost</th><th>Profit / loss</th><th>Date</th></tr></thead><tbody>
+                  {visibleOrders.map((order) => <tr key={order.id} className={order.estimatedProfit < 0 || order.unmatchedItems ? 'price-alert-row' : ''}><td><strong>#{order.wooOrderId}</strong></td><td><span className={`market-badge ${order.market === 'US' ? 'usa' : 'mexico'}`}><span className={`flag ${order.market === 'US' ? 'us' : 'mx'}`} />{order.market}</span></td><td>{order.customer}</td><td><strong>{order.status}</strong>{order.refund > 0 && <small>Refund {formatCurrency(order.refund, order.currency)}</small>}</td><td>{order.items.map((item) => <small key={item.id} className={item.linked ? 'included' : 'danger-text'}>{item.quantity}× {item.sku || item.name} · {item.linked ? `CJ ${item.cjSku}` : 'SKU not linked'}</small>)}</td><td><strong>{formatCurrency(order.total, order.currency)}</strong><small>Tax {formatCurrency(order.tax, order.currency)} · Shipping {formatCurrency(order.shipping, order.currency)}</small></td><td><strong>{formatCurrency(order.estimatedCost, order.currency)}</strong></td><td><strong className={order.estimatedProfit < 0 ? 'danger-text' : 'included'}>{formatCurrency(order.estimatedProfit, order.currency)}</strong><small>{order.unmatchedItems ? 'Incomplete until SKU is linked' : 'Estimated'}</small></td><td>{order.date ? new Date(order.date).toLocaleString() : '—'}</td></tr>)}
+                  {!visibleOrders.length && <tr><td colSpan={9} className="empty">{ordersLoading ? 'Loading WooCommerce orders…' : 'No WooCommerce orders found.'}</td></tr>}
+                </tbody></table></div>
               </section>
             )}
 

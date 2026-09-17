@@ -111,3 +111,10 @@ export const freezeWooProduct = async (identity, expectedSku = '') => {
     alreadyFrozen,
   };
 };
+
+export const listWooOrders = async (market, { perPage = 50 } = {}) => {
+  const safePerPage = Math.max(1, Math.min(100, Number(perPage) || 50));
+  const orders = await request(market, `/orders?per_page=${safePerPage}&orderby=date&order=desc`);
+  if (!Array.isArray(orders)) throw new Error(`WooCommerce ${market} returned an invalid orders payload.`);
+  return orders;
+};
