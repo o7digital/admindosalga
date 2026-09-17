@@ -64,7 +64,8 @@ export default function CjPriceCell({ product, onSaved, onPublished, disabled })
     </fieldset>
     <small className="cj-price-note" role="status">{unchanged ? (publication?.proposalSavedAt === saved.savedAt ? 'WooCommerce status below' : 'Saved in admin · ready for WooCommerce') : 'Draft · confirm delivery estimates before saving'}</small>
     {unchanged && <button className="cj-save" type="button" disabled={saving || disabled || publication?.proposalSavedAt === saved.savedAt || ['sending', 'unknown', 'woo_verified'].includes(publication?.state)} onClick={publish}>{saving ? 'Updating…' : 'Update WooCommerce now'}</button>}
-    {publication && <p role="status" className="cj-price-note">{publication.message || 'WooCommerce publication in progress; do not resend.'}</p>}
+    {publication?.state === 'woo_verified' && <p role="status" className="woo-confirmation">✓ Confirmed in WooCommerce: {formatCurrency(publication.price, publication.currency)}</p>}
+    {publication && publication.state !== 'woo_verified' && <p role="status" className="cj-price-note">{publication.message || 'WooCommerce publication in progress; do not resend.'}</p>}
     {saved && <small>Saved {new Date(saved.savedAt).toLocaleString()}</small>}
     {error && <p className="danger-text" role="alert">{error}</p>}
   </form></td>;

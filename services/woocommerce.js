@@ -51,7 +51,9 @@ export const reviewWooPrice = async (identity, expectedSku = '') => {
   let targets;
   if (product.type === 'variable') {
     const variations = await request(identity.market, `/products/${encodeURIComponent(identity.productId)}/variations?per_page=100`);
-    if (!Array.isArray(variations) || variations.length === 0) throw new Error('WooCommerce variable product has no variations to update.');
+    if (!Array.isArray(variations) || variations.length === 0) {
+      return { productType: 'simple', productName: product.name, targets: [{ id: product.id, sku: product.sku || dashboardSku, title: product.name, price: product.price }], emptyVariable: true };
+    }
     targets = variations.map(variation => ({ id: variation.id, sku: variation.sku || '', title: variation.name || `Variation ${variation.id}`, price: variation.price }));
   } else {
     targets = [{ id: product.id, sku: product.sku || dashboardSku, title: product.name, price: product.price }];
@@ -65,13 +67,15 @@ export const publishWooPrice = async (identity, price, expectedSku = '') => {
   const updatedVariations = [];
 
   if (review.productType === 'variable') {
-    for (const variation of review.targets) {
-      const updated = await request(identity.market, `/products/${encodeURIComponent(identity.productId)}/variations/${encodeURIComponent(variation.id)}`, {
-        method: 'PUT', body: JSON.stringify(update),
-      });
-      const verified = await request(identity.market, `/products/${encodeURIComponent(identity.productId)}/variations/${encodeURIComponent(variation.id)}`);
-      updatedVariations.push({ id: verified.id, sku: verified.sku || updated.sku, price: verified.price });
-    }
+    await request(identity.market, `/products/${encodeURIComponent(identity.productId)}/variations/batch`, {
+      method: 'POST',
+      body: JSON.stringify({ update: review.targets.map(variation => ({ id: variation.id, ...update })) }),
+    });
+    const verified = await request(identity.market, `/products/${encodeURIComponent(identity.productId)}/variations?per_page=100`);
+    const targetIds = new Set(review.targets.map(variation => String(variation.id)));
+    verified.filter(variation => targetIds.has(String(variation.id))).forEach(variation => {
+      updatedVariations.push({ id: variation.id, sku: variation.sku || '', price: variation.price });
+    });
   } else {
     const updated = await request(identity.market, `/products/${encodeURIComponent(identity.productId)}`, {
       method: 'PUT', body: JSON.stringify(update),

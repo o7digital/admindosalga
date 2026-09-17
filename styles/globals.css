@@ -128,6 +128,10 @@ td small { margin-top: 5px; color: #96989d; font-size: 8px; white-space: nowrap;
 .cj-price-cell button:disabled { opacity: .6; cursor: default; }
 .cj-price-cell input:focus-visible, .cj-price-cell button:focus-visible { outline: 2px solid #276d55; outline-offset: 2px; }
 .cj-price-cell p { font-size: 10px; line-height: 1.4; }
+.cj-price-cell .woo-confirmation { margin: 7px 0 2px; padding: 7px; border-radius: 5px; background: #e8f7ef; color: #176b45; font-weight: 700; }
+.new-sale-label, .new-sale-price { color: #1769d2 !important; }
+.new-sale-label { font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+.old-sale-price { color: #b01828 !important; text-decoration: line-through; }
 .competitor-cell button strong { color: #24262a; font-size: 9px; }
 .competitor-cell button small { margin-top: 4px; color: #8c8f94; font-size: 7px; }
 .product-cell { display: flex; align-items: center; gap: 11px; }

@@ -503,6 +503,7 @@ export default function ProductControl() {
   const confirmWooPricePublication = (productId, publication) => {
     setProducts((current) => current.map((product) => product.id === productId ? {
       ...product,
+      previousSalePrice: publication.previousPrice,
       salePrice: publication.price,
       wooPricePublication: publication,
     } : product));
@@ -859,7 +860,7 @@ export default function ProductControl() {
                         <td><span className="currency-pill">{product.saleCurrency}</span></td>
                         <td className="number"><strong>{formatCurrency(product.cjCostUsd, 'USD')}</strong><small>{product.cjSku || product.pid}</small></td>
                         <td><strong>{Number(product.shippingUsd) > 0 ? formatCurrency(product.shippingUsd, 'USD') : 'Not confirmed'}</strong><small>{product.shippingDestination} · {product.minDeliveryDays}-{product.maxDeliveryDays} days</small></td>
-                        <td className="number"><strong>{formatCurrency(product.salePrice, product.saleCurrency)}</strong>{product.saleCurrency === 'MXN' && <small className="usd-equivalent">≈ {formatCurrency(audit.saleUsd, 'USD')} · FX {product.exchangeRate}</small>}<small className={product.shippingIncluded ? 'included' : 'separate'}>{product.shippingIncluded === true ? '● Shipping included in sale price' : product.shippingIncluded === false ? '○ Shipping charged separately' : 'Shipping inclusion unconfirmed'}</small><small>Origin: {formatCurrency(product.sourcePrice, product.sourceCurrency)}{product.sourceCurrency !== product.saleCurrency ? ` · FX ${product.exchangeRate}` : ''}</small></td>
+                        <td className="number">{product.wooPricePublication?.state === 'woo_verified' ? <><small className="new-sale-label">New sale price</small><strong className="new-sale-price">{formatCurrency(product.salePrice, product.saleCurrency)}</strong><small className="old-sale-price">Old: {formatCurrency(product.wooPricePublication.previousPrice ?? product.previousSalePrice, product.saleCurrency)}</small></> : <strong>{formatCurrency(product.salePrice, product.saleCurrency)}</strong>}{product.saleCurrency === 'MXN' && <small className="usd-equivalent">≈ {formatCurrency(audit.saleUsd, 'USD')} · FX {product.exchangeRate}</small>}<small className={product.shippingIncluded ? 'included' : 'separate'}>{product.shippingIncluded === true ? '● Shipping included in sale price' : product.shippingIncluded === false ? '○ Shipping charged separately' : 'Shipping inclusion unconfirmed'}</small><small>Origin: {formatCurrency(product.sourcePrice, product.sourceCurrency)}{product.sourceCurrency !== product.saleCurrency ? ` · FX ${product.exchangeRate}` : ''}</small></td>
                         <CjPriceCell key={`${product.id}-${product.saleCurrency}-${product.cjPriceProposal?.savedAt || 'new'}`} product={product} onSaved={savePriceProposal} onPublished={confirmWooPricePublication} disabled={syncing || importingWp} />
                         {['Temu', 'Amazon'].map((competitorName) => {
                           const offer = product.competitors?.[competitorName.toLowerCase()];

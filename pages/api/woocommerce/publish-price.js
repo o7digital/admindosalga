@@ -48,6 +48,7 @@ export default async function handler(req, res) {
       message: `WooCommerce updated and verified (${woo.updated.length} price${woo.updated.length === 1 ? '' : 's'}). CJ was not changed.`,
       at: new Date().toISOString(),
       proposalSavedAt: proposal.savedAt,
+      previousPrice: Number(product.salePrice),
       price: proposal.price,
       currency: proposal.currency,
       wooVerified: true,
