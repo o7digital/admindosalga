@@ -11,9 +11,10 @@ const mapOrder = (order, market, products) => {
   const currency = order.currency || (market === 'MX' ? 'MXN' : 'USD');
   const items = (order.line_items || []).map((item) => {
     const sku = String(item.sku || '').trim();
-    const product = products.find((candidate) => (
-      [candidate.sku, candidate.cjSku, candidate.pid].filter(Boolean).map(String).includes(sku)
-    ));
+    const product = products.find((candidate) => [candidate.sku, candidate.cjSku, candidate.pid]
+      .filter(Boolean)
+      .map((value) => String(value).trim())
+      .some((identifier) => sku === identifier || sku.startsWith(identifier)));
     const rate = number(product?.exchangeRate) || 17.49;
     const unitCostUsd = product ? number(product.cjCostUsd ?? product.cjCost) + number(product.shippingIncluded ? product.shippingUsd : 0) : 0;
     const estimatedCost = costInCurrency(unitCostUsd * number(item.quantity), currency, rate);
@@ -25,13 +26,15 @@ const mapOrder = (order, market, products) => {
       quantity: number(item.quantity),
       revenue,
       estimatedCost,
-      estimatedProfit: revenue - estimatedCost,
+      estimatedProfit: product ? revenue - estimatedCost : null,
       linked: Boolean(product),
       cjSku: product?.cjSku || product?.pid || '',
     };
   });
   const estimatedCost = items.reduce((sum, item) => sum + item.estimatedCost, 0);
   const total = number(order.total);
+  const unmatchedItems = items.filter((item) => !item.linked).length;
+  const recognizedRevenue = ['processing', 'completed', 'on-hold'].includes(order.status);
   return {
     id: `${market}-${order.id}`,
     wooOrderId: order.id,
@@ -46,9 +49,10 @@ const mapOrder = (order, market, products) => {
     discount: number(order.discount_total),
     refund: Math.abs((order.refunds || []).reduce((sum, refund) => sum + number(refund.total), 0)),
     estimatedCost,
-    estimatedProfit: total - estimatedCost,
+    estimatedProfit: unmatchedItems ? null : total - estimatedCost,
+    recognizedRevenue,
     items,
-    unmatchedItems: items.filter((item) => !item.linked).length,
+    unmatchedItems,
   };
 };
 
