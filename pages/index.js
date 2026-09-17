@@ -458,7 +458,16 @@ export default function ProductControl() {
       persistProducts(next);
       return next;
     });
-    notify('Price proposal saved · not published to CJ or store');
+    notify('Price draft saved · not yet published to WooCommerce');
+  };
+
+  const confirmWooPricePublication = (productId, publication) => {
+    setProducts((current) => current.map((product) => product.id === productId ? {
+      ...product,
+      salePrice: publication.price,
+      wooPricePublication: publication,
+    } : product));
+    notify('WooCommerce price updated and verified · CJ unchanged');
   };
 
   const saveProduct = async (event) => {
@@ -782,7 +791,7 @@ export default function ProductControl() {
               </div>
               <div className="table-wrap">
                 <table>
-                  <thead><tr><th className="product-col">Product / brand</th><th>Store</th><th>Currency</th><th>CJ cost USD</th><th>Shipping USD</th><th>Sale price</th><th>Update price CJ</th><th>Temu</th><th>Amazon</th><th>Route & ETA</th><th>Stock</th><th>Margin</th><th>Sync</th><th /></tr></thead>
+                  <thead><tr><th className="product-col">Product / brand</th><th>Store</th><th>Currency</th><th>CJ cost USD</th><th>Shipping USD</th><th>Sale price</th><th>Update WooCommerce price</th><th>Temu</th><th>Amazon</th><th>Route & ETA</th><th>Stock</th><th>Margin</th><th>Sync</th><th /></tr></thead>
                   <tbody>{pageProducts.map((product) => {
                     const margin = calculateProductMargin(product);
                     const percent = Math.round(margin.marginRate * 100);
@@ -795,7 +804,7 @@ export default function ProductControl() {
                         <td className="number"><strong>{formatCurrency(product.cjCostUsd, 'USD')}</strong><small>{product.cjSku || product.pid}</small></td>
                         <td><strong>{Number(product.shippingUsd) > 0 ? formatCurrency(product.shippingUsd, 'USD') : 'Not confirmed'}</strong><small>{product.shippingDestination} · {product.minDeliveryDays}-{product.maxDeliveryDays} days</small></td>
                         <td className="number"><strong>{formatCurrency(product.salePrice, product.saleCurrency)}</strong>{product.saleCurrency === 'MXN' && <small className="usd-equivalent">≈ {formatCurrency(audit.saleUsd, 'USD')} · FX {product.exchangeRate}</small>}<small className={product.shippingIncluded ? 'included' : 'separate'}>{product.shippingIncluded === true ? '● Shipping included in sale price' : product.shippingIncluded === false ? '○ Shipping charged separately' : 'Shipping inclusion unconfirmed'}</small><small>{product.priceNormalization === 'woo-mx-confirmed-usd-v2' ? `Woo source: ${formatCurrency(product.sourceSalePriceUsd, 'USD')} · FX ${product.exchangeRate}` : `Woo price · ${product.saleCurrency}`}</small></td>
-                        <CjPriceCell key={`${product.id}-${product.saleCurrency}-${product.cjPriceProposal?.savedAt || 'new'}`} product={product} onSaved={savePriceProposal} disabled={syncing || importingWp} />
+                        <CjPriceCell key={`${product.id}-${product.saleCurrency}-${product.cjPriceProposal?.savedAt || 'new'}`} product={product} onSaved={savePriceProposal} onPublished={confirmWooPricePublication} disabled={syncing || importingWp} />
                         {['Temu', 'Amazon'].map((competitorName) => {
                           const offer = product.competitors?.[competitorName.toLowerCase()];
                           const competitorTotal = offer ? Number(offer.price) + (offer.shippingIncluded ? 0 : Number(offer.shippingCost || 0)) : null;

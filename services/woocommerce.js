@@ -37,28 +37,50 @@ const request = async (market, path, options = {}) => {
 
 const money = (price) => Number(price).toFixed(2);
 
-export const publishWooPrice = async (identity, price) => {
+export const reviewWooPrice = async (identity, expectedSku = '') => {
   const product = await request(identity.market, `/products/${encodeURIComponent(identity.productId)}`);
-  const update = { regular_price: money(price), sale_price: '' };
-  const updatedVariations = [];
+  const wooSku = String(product.sku || '').trim();
+  const dashboardSku = String(expectedSku || '').trim();
+  if (wooSku && dashboardSku && wooSku !== dashboardSku) {
+    throw new Error(`WooCommerce SKU mismatch: expected ${dashboardSku}, received ${wooSku}. No change was made.`);
+  }
+  if (product.status !== 'publish' || product.catalog_visibility === 'hidden') {
+    throw new Error('WooCommerce product is not published or is hidden. No change was made.');
+  }
 
+  let targets;
   if (product.type === 'variable') {
     const variations = await request(identity.market, `/products/${encodeURIComponent(identity.productId)}/variations?per_page=100`);
     if (!Array.isArray(variations) || variations.length === 0) throw new Error('WooCommerce variable product has no variations to update.');
-    for (const variation of variations) {
+    targets = variations.map(variation => ({ id: variation.id, sku: variation.sku || '', title: variation.name || `Variation ${variation.id}`, price: variation.price }));
+  } else {
+    targets = [{ id: product.id, sku: product.sku || dashboardSku, title: product.name, price: product.price }];
+  }
+  return { productType: product.type || 'simple', productName: product.name, targets };
+};
+
+export const publishWooPrice = async (identity, price, expectedSku = '') => {
+  const review = await reviewWooPrice(identity, expectedSku);
+  const update = { regular_price: money(price), sale_price: '' };
+  const updatedVariations = [];
+
+  if (review.productType === 'variable') {
+    for (const variation of review.targets) {
       const updated = await request(identity.market, `/products/${encodeURIComponent(identity.productId)}/variations/${encodeURIComponent(variation.id)}`, {
         method: 'PUT', body: JSON.stringify(update),
       });
-      updatedVariations.push({ id: updated.id, sku: updated.sku, price: updated.price });
+      const verified = await request(identity.market, `/products/${encodeURIComponent(identity.productId)}/variations/${encodeURIComponent(variation.id)}`);
+      updatedVariations.push({ id: verified.id, sku: verified.sku || updated.sku, price: verified.price });
     }
   } else {
     const updated = await request(identity.market, `/products/${encodeURIComponent(identity.productId)}`, {
       method: 'PUT', body: JSON.stringify(update),
     });
-    updatedVariations.push({ id: updated.id, sku: updated.sku, price: updated.price });
+    const verified = await request(identity.market, `/products/${encodeURIComponent(identity.productId)}`);
+    updatedVariations.push({ id: verified.id, sku: verified.sku || updated.sku, price: verified.price });
   }
 
-  return { productType: product.type || 'simple', updated: updatedVariations };
+  return { productType: review.productType, updated: updatedVariations };
 };
 
 export const freezeWooProduct = async (identity, expectedSku = '') => {

@@ -23,9 +23,9 @@ n'est envoyé au navigateur. `CJ_ACCESS_TOKEN` peut aussi être utilisé tempora
 La synchronisation catalogue récupère les coûts et les stocks par lots de quatre produits.
 L'import d'un produit individuel récupère également les routes et coûts de livraison.
 
-## Prix proposés CJ (US / MX)
+## Prix WooCommerce (US / MX)
 
-La colonne « Update price CJ » permet de saisir un prix de vente proposé dans la devise
+La colonne « Update WooCommerce price » permet de saisir un prix de vente dans la devise
 de la fiche, de préciser si la livraison est incluse et de confirmer les délais min/max.
 La suggestion vise 35 % de marge : coût produit et livraison incluse, convertis avec le
 taux de la fiche, divisés par (1 − 35 % − frais plateforme − taxes configurées), arrondis
@@ -36,7 +36,9 @@ et les délais existants sont des estimations à vérifier, pas des données tem
 Les propositions sont enregistrées dans PostgreSQL (`store_listings.metadata.cjPriceProposal`)
 via `PUT /api/cj/price-proposal`, par fiche et par marché. Les imports WooCommerce et
 synchronisations CJ les préservent. Elles figurent également dans l'export CSV.
-Le bouton enregistre un brouillon : il ne modifie ni le prix actuel ni CJ ni WooCommerce.
+Le bouton enregistre un brouillon. « Review & update WooCommerce » met ensuite à jour le
+produit simple ou toutes ses variations dans la boutique correspondante, puis relit chaque
+prix pour le vérifier. Cette opération ne modifie jamais CJ.
 
 La [documentation CJ Shop](https://developers.cjdropshipping.com/en/api/api2/api/shop.html)
 documente `saveProduct` et `saveVariantBatch` pour enregistrer les produits/prix de boutique
@@ -109,9 +111,11 @@ La clé existante reste côté serveur. Une erreur, un délai dépassé (25 s) o
 invalide est signalé explicitement avec un rapport de règles disponible en secours.
 Tests : `node --test tests/*.test.mjs`.
 
-## Envoi des prix vers CJ
+## Ancien envoi conjoint vers CJ
 
-Après sauvegarde, « Review & publish CJ + WooCommerce » vérifie le hostname de la boutique autorisée,
+L'ancien endpoint conjoint reste disponible pour compatibilité, mais il n'est plus utilisé par
+l'interface de gestion des prix. Le dashboard publie désormais directement dans WooCommerce.
+L'ancien flux vérifie le hostname de la boutique autorisée,
 la devise, le produit et toutes ses variantes via l'API CJ. La confirmation indique
 explicitement que le prix saisi sera envoyé à toutes les variantes listées.
 `POST /api/cj/publish-price` utilise exclusivement le brouillon enregistré côté serveur.
