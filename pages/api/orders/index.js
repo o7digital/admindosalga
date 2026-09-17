@@ -11,10 +11,12 @@ const mapOrder = (order, market, products) => {
   const currency = order.currency || (market === 'MX' ? 'MXN' : 'USD');
   const items = (order.line_items || []).map((item) => {
     const sku = String(item.sku || '').trim();
-    const product = products.find((candidate) => [candidate.sku, candidate.cjSku, candidate.pid]
-      .filter(Boolean)
-      .map((value) => String(value).trim())
-      .some((identifier) => sku === identifier || sku.startsWith(identifier)));
+    const expectedWooId = `wp-dosalga-${market === 'MX' ? 'mexico' : 'usa'}-${item.product_id}`;
+    const product = products.find((candidate) => candidate.id === expectedWooId)
+      || products.find((candidate) => [candidate.sku, candidate.cjSku, candidate.pid]
+        .filter(Boolean)
+        .map((value) => String(value).trim())
+        .some((identifier) => sku === identifier || sku.startsWith(identifier)));
     const rate = number(product?.exchangeRate) || 17.49;
     const unitCostUsd = product ? number(product.cjCostUsd ?? product.cjCost) + number(product.shippingIncluded ? product.shippingUsd : 0) : 0;
     const estimatedCost = costInCurrency(unitCostUsd * number(item.quantity), currency, rate);
