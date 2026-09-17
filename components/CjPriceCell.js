@@ -10,7 +10,6 @@ export default function CjPriceCell({ product, onSaved, onPublished, disabled })
   const [maxDays, setMaxDays] = useState(saved?.maxDeliveryDays ?? product.maxDeliveryDays ?? '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [review, setReview] = useState(null);
   const [publication, setPublication] = useState(product.wooPricePublication || null);
   const suggestion = suggestCjPrice(product, shippingIncluded);
   const margin = calculateProductMargin({ ...product, salePrice: Number(price), shippingIncluded });
@@ -38,19 +37,19 @@ export default function CjPriceCell({ product, onSaved, onPublished, disabled })
     }
   };
 
-  const publish = async (confirm = false) => {
+  const publish = async () => {
     setSaving(true);
     setError('');
     try {
-      const response = await fetch(confirm ? '/api/woocommerce/publish-price' : `/api/woocommerce/publish-price?productId=${encodeURIComponent(product.id)}`, confirm ? {
+      const response = await fetch('/api/woocommerce/publish-price', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ productId: product.id, savedAt: review.savedAt, confirmAllVariants: true }),
-      } : {});
+        body: JSON.stringify({ productId: product.id, savedAt: saved.savedAt, confirmAllVariants: true }),
+      });
       const result = await response.json();
       if (!response.ok) throw new Error(result.message || 'WooCommerce publication failed.');
-      if (confirm) { setPublication(result.publication); setReview(null); onPublished?.(product.id, result.publication); }
-      else setReview(result);
-    } catch (failure) { setError(failure.message); setReview(null); }
+      setPublication(result.publication);
+      onPublished?.(product.id, result.publication);
+    } catch (failure) { setError(failure.message); }
     finally { setSaving(false); }
   };
 
@@ -64,8 +63,7 @@ export default function CjPriceCell({ product, onSaved, onPublished, disabled })
       <button type="submit" className="cj-save" disabled={unchanged}>{saving ? 'Saving…' : unchanged ? 'Draft saved' : 'Save price draft'}</button>
     </fieldset>
     <small className="cj-price-note" role="status">{unchanged ? (publication?.proposalSavedAt === saved.savedAt ? 'WooCommerce status below' : 'Saved in admin · ready for WooCommerce') : 'Draft · confirm delivery estimates before saving'}</small>
-    {unchanged && <button className="cj-save" type="button" disabled={saving || disabled || publication?.proposalSavedAt === saved.savedAt || ['sending', 'unknown', 'woo_verified'].includes(publication?.state)} onClick={() => publish(false)}>Review & update WooCommerce</button>}
-    {review && unchanged && <div className="cj-price-note"><strong>{review.store} · {formatCurrency(review.price, review.currency)}</strong><p>{review.message}</p><ul>{review.variants.map(v => <li key={v.id}>{v.sku || `#${v.id}`} · {v.title}</li>)}</ul><button type="button" className="cj-save" disabled={saving || disabled} onClick={() => publish(true)}>Confirm WooCommerce price for all {review.variants.length}</button><button type="button" disabled={saving} onClick={() => setReview(null)}>Cancel</button></div>}
+    {unchanged && <button className="cj-save" type="button" disabled={saving || disabled || publication?.proposalSavedAt === saved.savedAt || ['sending', 'unknown', 'woo_verified'].includes(publication?.state)} onClick={publish}>{saving ? 'Updating…' : 'Update WooCommerce now'}</button>}
     {publication && <p role="status" className="cj-price-note">{publication.message || 'WooCommerce publication in progress; do not resend.'}</p>}
     {saved && <small>Saved {new Date(saved.savedAt).toLocaleString()}</small>}
     {error && <p className="danger-text" role="alert">{error}</p>}
