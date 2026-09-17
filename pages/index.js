@@ -1,5 +1,5 @@
 import { productAudit, compareProductPriority } from '@/lib/productAlerts.mjs';
-import { normalizeWooPrice } from '@/lib/wooPricing.mjs';
+import { convertSourcePrice, normalizeWooPrice } from '@/lib/wooPricing.mjs';
 import Head from 'next/head';
 import CjPriceCell from '@/components/CjPriceCell';
 import { useEffect, useMemo, useState } from 'react';
@@ -27,6 +27,9 @@ const blankProduct = {
   cjCostCurrency: 'USD',
   salePrice: 0,
   saleCurrency: 'USD',
+  sourcePrice: 0,
+  sourceCurrency: 'USD',
+  sourceManagedByAdmin: false,
   exchangeRate: 17.49,
   shippingIncluded: true,
   shippingCost: 0,
@@ -88,6 +91,8 @@ function normalizeProduct(product) {
     exchangeRate: Number(product.exchangeRate) || 17.49,
     stock: Number(product.stock ?? product.quantityPlanned) || 0,
     saleCurrency: product.saleCurrency || (siteId === 'dosalga-usa' ? 'USD' : 'MXN'),
+    sourceCurrency: product.sourceCurrency || product.saleCurrency || (siteId === 'dosalga-usa' ? 'USD' : 'MXN'),
+    sourcePrice: Number(product.sourcePrice ?? product.salePrice) || 0,
     cjCostCurrency: product.cjCostCurrency || product.saleCurrency || 'MXN',
     shippingCurrency: product.shippingCurrency || product.saleCurrency || 'MXN',
     shippingOrigin: product.shippingOrigin || 'CJ · China',
@@ -803,7 +808,7 @@ export default function ProductControl() {
                         <td><span className="currency-pill">{product.saleCurrency}</span></td>
                         <td className="number"><strong>{formatCurrency(product.cjCostUsd, 'USD')}</strong><small>{product.cjSku || product.pid}</small></td>
                         <td><strong>{Number(product.shippingUsd) > 0 ? formatCurrency(product.shippingUsd, 'USD') : 'Not confirmed'}</strong><small>{product.shippingDestination} · {product.minDeliveryDays}-{product.maxDeliveryDays} days</small></td>
-                        <td className="number"><strong>{formatCurrency(product.salePrice, product.saleCurrency)}</strong>{product.saleCurrency === 'MXN' && <small className="usd-equivalent">≈ {formatCurrency(audit.saleUsd, 'USD')} · FX {product.exchangeRate}</small>}<small className={product.shippingIncluded ? 'included' : 'separate'}>{product.shippingIncluded === true ? '● Shipping included in sale price' : product.shippingIncluded === false ? '○ Shipping charged separately' : 'Shipping inclusion unconfirmed'}</small><small>{product.priceNormalization === 'woo-mx-confirmed-usd-v2' ? `Woo source: ${formatCurrency(product.sourceSalePriceUsd, 'USD')} · FX ${product.exchangeRate}` : `Woo price · ${product.saleCurrency}`}</small></td>
+                        <td className="number"><strong>{formatCurrency(product.salePrice, product.saleCurrency)}</strong>{product.saleCurrency === 'MXN' && <small className="usd-equivalent">≈ {formatCurrency(audit.saleUsd, 'USD')} · FX {product.exchangeRate}</small>}<small className={product.shippingIncluded ? 'included' : 'separate'}>{product.shippingIncluded === true ? '● Shipping included in sale price' : product.shippingIncluded === false ? '○ Shipping charged separately' : 'Shipping inclusion unconfirmed'}</small><small>Origin: {formatCurrency(product.sourcePrice, product.sourceCurrency)}{product.sourceCurrency !== product.saleCurrency ? ` · FX ${product.exchangeRate}` : ''}</small></td>
                         <CjPriceCell key={`${product.id}-${product.saleCurrency}-${product.cjPriceProposal?.savedAt || 'new'}`} product={product} onSaved={savePriceProposal} onPublished={confirmWooPricePublication} disabled={syncing || importingWp} />
                         {['Temu', 'Amazon'].map((competitorName) => {
                           const offer = product.competitors?.[competitorName.toLowerCase()];
@@ -836,7 +841,8 @@ export default function ProductControl() {
                 <label>Product name<input required value={editingProduct.name} onChange={(event) => updateField('name', event.target.value)} placeholder="Essential Training Set" /></label>
                 <div className="form-grid"><label>Store<select value={editingProduct.siteId} onChange={(event) => updateField('siteId', event.target.value)}><option value="dosalga-usa">Dosalga USA</option><option value="dosalga-mexico">Dosalga México</option><option value="both">Both stores</option></select></label><label>Brand<input value={editingProduct.brand} onChange={(event) => updateField('brand', event.target.value)} /></label></div>
                 <div className="form-grid"><label>Category<input value={editingProduct.category} onChange={(event) => updateField('category', event.target.value)} /></label><label>SKU Dosalga<input value={editingProduct.sku} onChange={(event) => updateField('sku', event.target.value)} /></label></div>
-                <div className="form-grid three"><label>Currency<select value={editingProduct.saleCurrency} onChange={(event) => { updateField('saleCurrency', event.target.value); updateField('cjCostCurrency', event.target.value); updateField('shippingCurrency', event.target.value); }}><option>USD</option><option>MXN</option></select></label><label>Sale price<input type="number" step="0.01" value={editingProduct.salePrice} onChange={(event) => updateField('salePrice', Number(event.target.value))} /></label><label>CJ cost<input type="number" step="0.01" value={editingProduct.cjCost} onChange={(event) => updateField('cjCost', Number(event.target.value))} /></label></div>
+                <div className="form-grid three"><label>Origin currency<select value={editingProduct.sourceCurrency} onChange={(event) => { const sourceCurrency = event.target.value; setEditingProduct((current) => ({ ...current, sourceCurrency, sourceManagedByAdmin: true, salePrice: convertSourcePrice(current.sourcePrice, sourceCurrency, current.saleCurrency, current.exchangeRate) })); }}><option>USD</option><option>MXN</option></select></label><label>Origin price<input type="number" step="0.01" value={editingProduct.sourcePrice} onChange={(event) => { const sourcePrice = Number(event.target.value); setEditingProduct((current) => ({ ...current, sourcePrice, sourceManagedByAdmin: true, salePrice: convertSourcePrice(sourcePrice, current.sourceCurrency, current.saleCurrency, current.exchangeRate) })); }} /></label><label>Store currency<input value={editingProduct.saleCurrency} readOnly /></label></div>
+                <div className="form-grid three"><label>FX USD/MXN<input type="number" step="0.01" value={editingProduct.exchangeRate} onChange={(event) => { const exchangeRate = Number(event.target.value); setEditingProduct((current) => ({ ...current, exchangeRate, sourceManagedByAdmin: true, salePrice: convertSourcePrice(current.sourcePrice, current.sourceCurrency, current.saleCurrency, exchangeRate) })); }} /></label><label>Calculated sale price<input type="number" step="0.01" value={editingProduct.salePrice} readOnly /></label><label>CJ cost USD<input type="number" step="0.01" value={editingProduct.cjCost} onChange={(event) => updateField('cjCost', Number(event.target.value))} /></label></div>
                 <div className="form-grid"><label>Shipping price<input type="number" step="0.01" value={editingProduct.shippingCost} onChange={(event) => updateField('shippingCost', Number(event.target.value))} /></label><label>Shipping mode<select value={editingProduct.shippingIncluded ? 'included' : 'separate'} onChange={(event) => updateField('shippingIncluded', event.target.value === 'included')}><option value="included">Included in price</option><option value="separate">Charged separately</option></select></label></div>
                 <div className="form-grid three"><label>Origin<input value={editingProduct.shippingOrigin} onChange={(event) => updateField('shippingOrigin', event.target.value)} /></label><label>Destination<input value={editingProduct.shippingDestination} onChange={(event) => updateField('shippingDestination', event.target.value)} /></label><label>Method<input value={editingProduct.transportMethod} onChange={(event) => updateField('transportMethod', event.target.value)} /></label></div>
                 <div className="form-grid three"><label>Min days<input type="number" value={editingProduct.minDeliveryDays} onChange={(event) => updateField('minDeliveryDays', Number(event.target.value))} /></label><label>Max days<input type="number" value={editingProduct.maxDeliveryDays} onChange={(event) => updateField('maxDeliveryDays', Number(event.target.value))} /></label><label>Stock<input type="number" value={editingProduct.stock} onChange={(event) => updateField('stock', Number(event.target.value))} /></label></div>

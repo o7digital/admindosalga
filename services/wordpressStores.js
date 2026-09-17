@@ -73,9 +73,7 @@ const mapWooProduct = (product, source) => {
   const rawPrice = asNumber(product.prices?.price || product.price || product.sale_price || product.regular_price);
   const minorUnit = Number(product.prices?.currency_minor_unit ?? 2);
   const storePrice = rawPrice / (10 ** minorUnit);
-  // The US backend currently exposes MXN-denominated numeric values while labelling them USD.
-  // Preserve the existing normalization until the source catalogue is corrected.
-  const salePrice = Number((source.id === 'dosalga-usa' ? storePrice / exchangeRate : storePrice).toFixed(2));
+  const salePrice = Number(storePrice.toFixed(2));
   const image = Array.isArray(product.images) ? product.images[0] : product.images;
   const imageUrl = image?.thumbnail || image?.src || '';
   const cjCostUsd = asNumber(getMeta(product, 'cj_cost_usd') || getMeta(product, '_cj_cost_usd') || getMeta(product, 'cj_cost') || getMeta(product, '_cj_cost'));
@@ -103,6 +101,8 @@ const mapWooProduct = (product, source) => {
     cjCostCurrency: 'USD',
     salePrice,
     saleCurrency: source.currency,
+    sourcePrice: salePrice,
+    sourceCurrency: source.currency,
     exchangeRate,
     shippingIncluded: true,
     shippingCost: shippingUsd,
