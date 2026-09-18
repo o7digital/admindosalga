@@ -78,7 +78,7 @@ export const publishWooPrice = async (identity, price, expectedSku = '') => {
     });
   } else {
     const updated = await request(identity.market, `/products/${encodeURIComponent(identity.productId)}`, {
-      method: 'PUT', body: JSON.stringify(update),
+      method: 'PUT', body: JSON.stringify(review.emptyVariable ? { ...update, type: 'simple' } : update),
     });
     const verified = await request(identity.market, `/products/${encodeURIComponent(identity.productId)}`);
     updatedVariations.push({ id: verified.id, sku: verified.sku || updated.sku, price: verified.price });
