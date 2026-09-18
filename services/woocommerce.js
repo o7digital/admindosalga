@@ -122,3 +122,24 @@ export const listWooOrders = async (market, { perPage = 50 } = {}) => {
   if (!Array.isArray(orders)) throw new Error(`WooCommerce ${market} returned an invalid orders payload.`);
   return orders;
 };
+
+export const assignWooCategory = async (identity, categorySlug) => {
+  const slug = String(categorySlug || '').trim().toLowerCase();
+  if (!slug) throw new Error('A WooCommerce category slug is required.');
+  const categories = await request(identity.market, `/products/categories?slug=${encodeURIComponent(slug)}&per_page=100`);
+  const category = Array.isArray(categories) ? categories.find(item => item.slug === slug) : null;
+  if (!category) throw new Error(`WooCommerce category "${slug}" was not found.`);
+  const path = `/products/${encodeURIComponent(identity.productId)}`;
+  const product = await request(identity.market, path);
+  const ids = new Set((product.categories || []).map(item => Number(item.id)));
+  ids.add(Number(category.id));
+  await request(identity.market, path, {
+    method: 'PUT',
+    body: JSON.stringify({ categories: [...ids].map(id => ({ id })) }),
+  });
+  const verified = await request(identity.market, path);
+  if (!(verified.categories || []).some(item => item.slug === slug)) {
+    throw new Error(`WooCommerce did not confirm category "${slug}".`);
+  }
+  return { productId: verified.id, category: slug, categories: verified.categories };
+};
