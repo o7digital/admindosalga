@@ -15,6 +15,7 @@ export default function CjPriceCell({ product, onSaved, onPublished, disabled })
   const margin = calculateProductMargin({ ...product, salePrice: Number(price), shippingIncluded });
   const unchanged = saved && Number(price) === saved.price && shippingIncluded === saved.shippingIncluded
     && Number(minDays) === saved.minDeliveryDays && Number(maxDays) === saved.maxDeliveryDays;
+  const publishedCurrent = publication?.state === 'woo_verified' && publication?.proposalSavedAt === saved?.savedAt;
 
   const save = async (event) => {
     event.preventDefault();
@@ -63,9 +64,9 @@ export default function CjPriceCell({ product, onSaved, onPublished, disabled })
       <button type="submit" className="cj-save" disabled={unchanged}>{saving ? 'Saving…' : unchanged ? 'Draft saved' : 'Save price draft'}</button>
     </fieldset>
     <small className="cj-price-note" role="status">{unchanged ? (publication?.proposalSavedAt === saved.savedAt ? 'WooCommerce status below' : 'Saved in admin · ready for WooCommerce') : 'Draft · confirm delivery estimates before saving'}</small>
-    {unchanged && <button className="cj-save" type="button" disabled={saving || disabled || publication?.proposalSavedAt === saved.savedAt || ['sending', 'unknown', 'woo_verified'].includes(publication?.state)} onClick={publish}>{saving ? 'Updating…' : 'Update WooCommerce now'}</button>}
-    {publication?.state === 'woo_verified' && <p role="status" className="woo-confirmation">✓ Confirmed in WooCommerce: {formatCurrency(publication.price, publication.currency)}</p>}
-    {publication && publication.state !== 'woo_verified' && <p role="status" className="cj-price-note">{publication.message || 'WooCommerce publication in progress; do not resend.'}</p>}
+    {unchanged && !publishedCurrent && <button className="cj-save" type="button" disabled={saving || disabled || ['sending', 'unknown'].includes(publication?.state)} onClick={publish}>{saving ? 'Updating…' : 'Update WooCommerce now'}</button>}
+    {publishedCurrent && <p role="status" className="woo-confirmation">✓ Confirmed in WooCommerce: {formatCurrency(publication.price, publication.currency)}</p>}
+    {publication && !publishedCurrent && publication.state !== 'woo_verified' && <p role="status" className="cj-price-note">{publication.message || 'WooCommerce publication in progress; do not resend.'}</p>}
     {saved && <small>Saved {new Date(saved.savedAt).toLocaleString()}</small>}
     {error && <p className="danger-text" role="alert">{error}</p>}
   </form></td>;

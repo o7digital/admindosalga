@@ -450,6 +450,9 @@ button.insight-row:hover { color: var(--red-dark); }
 .price-alert-row:hover > td { background: #ffe4e4 !important; }
 .price-alert-row > td:first-child { border-left: 4px solid #c82333; }
 .price-alert-row .number > strong, .price-alert-row .product-alert-reason { color: #b01828; }
+.price-success-row > td { background: #eaf8ef !important; border-top-color: #a8d9b9; }
+.price-success-row:hover > td { background: #dcf3e5 !important; }
+.price-success-row > td:first-child { border-left: 4px solid #238a57; }
 .product-cell .product-alert-reason { white-space: normal; max-width: 245px; line-height: 1.5; font-size: 10px; }
 .number .usd-equivalent { font-size: 11px; font-weight: 700; color: #30343a; }
 .audit-item { padding: 15px; margin: 12px 0; border: 1px solid #ddd; border-radius: 6px; }

@@ -356,7 +356,15 @@ export default function ProductControl() {
     const marginMatch = marginFilter === 'All margins' || (marginFilter === 'Under 35%' ? margin < 0.35 : margin >= 0.35);
     const searchMatch = !q || `${product.name} ${product.brand} ${product.sku} ${product.cjSku}`.toLowerCase().includes(q);
     return marketMatch && categoryMatch && shippingMatch && marginMatch && searchMatch;
-  }).sort(compareProductPriority), [category, marginFilter, market, products, query, shippingFilter]);
+  }).sort((a, b) => {
+    const aPublished = a.wooPricePublication?.state === 'woo_verified'
+      && a.wooPricePublication?.proposalSavedAt === a.cjPriceProposal?.savedAt;
+    const bPublished = b.wooPricePublication?.state === 'woo_verified'
+      && b.wooPricePublication?.proposalSavedAt === b.cjPriceProposal?.savedAt;
+    return Number(bPublished) - Number(aPublished)
+      || String(b.wooPricePublication?.at || '').localeCompare(String(a.wooPricePublication?.at || ''))
+      || compareProductPriority(a, b);
+  }), [category, marginFilter, market, products, query, shippingFilter]);
 
   useEffect(() => setPage(1), [category, marginFilter, market, query, shippingFilter]);
 
@@ -853,14 +861,16 @@ export default function ProductControl() {
                     const margin = calculateProductMargin(product);
                     const percent = Math.round(margin.marginRate * 100);
                     const audit = productAudit(product);
+                    const publishedCurrent = product.wooPricePublication?.state === 'woo_verified'
+                      && product.wooPricePublication?.proposalSavedAt === product.cjPriceProposal?.savedAt;
                     return (
-                      <tr key={product.id} className={audit.critical ? 'price-alert-row' : ''}>
+                      <tr key={product.id} className={publishedCurrent ? 'price-success-row' : audit.critical ? 'price-alert-row' : ''}>
                         <td><div className="product-cell"><ProductVisual product={product} /><div><strong>{product.productUrl ? <a href={product.productUrl} target="_blank" rel="noreferrer">{product.name}</a> : product.name}</strong><span>{product.brand} · {product.sku}</span><small className={`status ${product.wooFrozen ? 'blocked' : product.status === 'paused' || product.status === 'review' ? 'review' : product.stock <= 10 ? 'low-stock' : ''}`}>{product.wooFrozen ? 'Bloqué dans WooCommerce' : product.status}</small>{audit.issues.length > 0 && <small className="product-alert-reason">⚠ {audit.issues[0].message}</small>}{product.wooFrozen ? <span className="sale-blocked-badge">⛔ Vente bloquée</span> : <button type="button" className="block-sale-button" disabled={blockingProductId === product.id} onClick={() => blockProductSale(product)}>{blockingProductId === product.id ? 'Blocage…' : 'Bloquer la vente'}</button>}</div></div></td>
                         <td><span className={`market-badge ${marketFor(product) === 'USA' ? 'usa' : 'mexico'}`}>{marketFor(product) !== 'Both' && <span className={`flag ${marketFor(product) === 'USA' ? 'us' : 'mx'}`} />}{marketFor(product)}</span></td>
                         <td><span className="currency-pill">{product.saleCurrency}</span></td>
                         <td className="number"><strong>{formatCurrency(product.cjCostUsd, 'USD')}</strong><small>{product.cjSku || product.pid}</small></td>
                         <td><strong>{Number(product.shippingUsd) > 0 ? formatCurrency(product.shippingUsd, 'USD') : 'Not confirmed'}</strong><small>{product.shippingDestination} · {product.minDeliveryDays}-{product.maxDeliveryDays} days</small></td>
-                        <td className="number">{product.wooPricePublication?.state === 'woo_verified' ? <><small className="new-sale-label">New sale price</small><strong className="new-sale-price">{formatCurrency(product.salePrice, product.saleCurrency)}</strong><small className="old-sale-price">Old: {formatCurrency(product.wooPricePublication.previousPrice ?? product.previousSalePrice ?? product.sourcePrice, product.saleCurrency)}</small></> : <strong>{formatCurrency(product.salePrice, product.saleCurrency)}</strong>}{product.saleCurrency === 'MXN' && <small className="usd-equivalent">≈ {formatCurrency(audit.saleUsd, 'USD')} · FX {product.exchangeRate}</small>}<small className={product.shippingIncluded ? 'included' : 'separate'}>{product.shippingIncluded === true ? '● Shipping included in sale price' : product.shippingIncluded === false ? '○ Shipping charged separately' : 'Shipping inclusion unconfirmed'}</small><small>Origin: {formatCurrency(product.sourcePrice, product.sourceCurrency)}{product.sourceCurrency !== product.saleCurrency ? ` · FX ${product.exchangeRate}` : ''}</small></td>
+                        <td className="number">{publishedCurrent ? <><small className="new-sale-label">New sale price</small><strong className="new-sale-price">{formatCurrency(product.salePrice, product.saleCurrency)}</strong><small className="old-sale-price">Old: {formatCurrency(product.wooPricePublication.previousPrice ?? product.previousSalePrice ?? product.sourcePrice, product.saleCurrency)}</small></> : <strong>{formatCurrency(product.salePrice, product.saleCurrency)}</strong>}{product.saleCurrency === 'MXN' && <small className="usd-equivalent">≈ {formatCurrency(audit.saleUsd, 'USD')} · FX {product.exchangeRate}</small>}<small className={product.shippingIncluded ? 'included' : 'separate'}>{product.shippingIncluded === true ? '● Shipping included in sale price' : product.shippingIncluded === false ? '○ Shipping charged separately' : 'Shipping inclusion unconfirmed'}</small><small>Origin: {formatCurrency(product.sourcePrice, product.sourceCurrency)}{product.sourceCurrency !== product.saleCurrency ? ` · FX ${product.exchangeRate}` : ''}</small></td>
                         <CjPriceCell key={`${product.id}-${product.saleCurrency}-${product.cjPriceProposal?.savedAt || 'new'}`} product={product} onSaved={savePriceProposal} onPublished={confirmWooPricePublication} disabled={syncing || importingWp} />
                         {['Temu', 'Amazon'].map((competitorName) => {
                           const offer = product.competitors?.[competitorName.toLowerCase()];
