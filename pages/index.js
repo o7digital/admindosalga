@@ -7,7 +7,7 @@ import { UserButton } from '@clerk/nextjs';
 import { calculateProductMargin, formatCurrency, formatPercent } from '@/lib/margins';
 
 const logoUrl = 'https://www.dosalga.store/logo-dosalga.png';
-const pageSize = 6;
+const defaultPageSize = 25;
 const cjBatchSize = 4;
 const productsCacheKey = 'dosalga-admin-products-v2';
 
@@ -262,6 +262,9 @@ export default function ProductControl() {
   const [shippingFilter, setShippingFilter] = useState('All shipping');
   const [marginFilter, setMarginFilter] = useState('All margins');
   const [page, setPage] = useState(1);
+  const [showAllProducts, setShowAllProducts] = useState(false);
+  const [fx, setFx] = useState(null);
+  const [fxApplying, setFxApplying] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(blankProduct);
   const [syncing, setSyncing] = useState(false);
@@ -276,6 +279,7 @@ export default function ProductControl() {
   const [savingCompetitor, setSavingCompetitor] = useState(false);
   const [blockingProductId, setBlockingProductId] = useState('');
   const clerkEnabled = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
+  const editorName = () => window.Clerk?.user?.fullName || window.Clerk?.user?.primaryEmailAddress?.emailAddress || 'System';
 
   const persistProducts = (nextProducts) => {
     try {
@@ -318,6 +322,7 @@ export default function ProductControl() {
 
   useEffect(() => {
     loadProducts().catch((loadError) => setError(loadError.message || 'Products could not be loaded.'));
+    fetch('/api/exchange-rate', { cache: 'no-store' }).then((response) => response.json()).then(setFx).catch(() => {});
     loadCjConnection().catch((loadError) => {
       setCjConnection({ configured: true, connected: false, mode: 'error', message: loadError.message });
     });
@@ -354,7 +359,7 @@ export default function ProductControl() {
     const categoryMatch = category === 'All categories' || product.category === category;
     const shippingMatch = shippingFilter === 'All shipping' || (shippingFilter === 'Included' ? product.shippingIncluded : !product.shippingIncluded);
     const marginMatch = marginFilter === 'All margins' || (marginFilter === 'Under 35%' ? margin < 0.35 : margin >= 0.35);
-    const searchMatch = !q || `${product.name} ${product.brand} ${product.sku} ${product.cjSku}`.toLowerCase().includes(q);
+    const searchMatch = !q || `${product.name} ${product.brand} ${product.category} ${product.sku} ${product.cjSku} ${product.pid} ${(product.variations || []).map((variation) => `${variation.name || ''} ${variation.sku || ''}`).join(' ')}`.toLowerCase().includes(q);
     return marketMatch && categoryMatch && shippingMatch && marginMatch && searchMatch;
   }).sort((a, b) => {
     const aPublished = a.wooPricePublication?.state === 'woo_verified'
@@ -431,6 +436,7 @@ export default function ProductControl() {
     unmatched: visibleOrders.reduce((sum, order) => sum + order.unmatchedItems, 0),
   }), [visibleOrders]);
 
+  const pageSize = showAllProducts ? Math.max(filtered.length, 1) : defaultPageSize;
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const pageProducts = filtered.slice((page - 1) * pageSize, page * pageSize);
   const currentMargin = calculateProductMargin(editingProduct);
@@ -524,7 +530,7 @@ export default function ProductControl() {
     const response = await fetch('/api/products', {
       method: editingProduct.id ? 'PUT' : 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(editingProduct),
+      body: JSON.stringify({ ...editingProduct, editor: editorName() }),
     });
     if (!response.ok) {
       const result = await response.json();
@@ -534,6 +540,19 @@ export default function ProductControl() {
     setModalOpen(false);
     await loadProducts();
     notify(editingProduct.id ? 'Product updated' : 'Product created');
+  };
+
+  const applyExchangeRate = async () => {
+    if (!fx?.rate || !window.confirm(`Valider le taux ${fx.rate} USD/MXN pour tout le catalogue ? Les prix calculés seront mis à jour dans le dashboard, sans publication automatique vers WooCommerce.`)) return;
+    setFxApplying(true);
+    setError('');
+    try {
+      const response = await fetch('/api/exchange-rate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rate: fx.rate, editor: editorName() }) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || 'FX update failed.');
+      await loadProducts();
+      notify(`FX ${result.rate} validé · ${result.updated} produits actualisés`);
+    } catch (applyError) { setError(applyError.message); } finally { setFxApplying(false); }
   };
 
   const archiveProduct = async (product) => {
@@ -852,11 +871,13 @@ export default function ProductControl() {
                 <label className="select-wrap"><select value={category} onChange={(event) => setCategory(event.target.value)}>{categories.map((item) => <option key={item}>{item}</option>)}</select><Icon name="chevron" size={15} /></label>
                 <label className="select-wrap"><select value={shippingFilter} onChange={(event) => setShippingFilter(event.target.value)}><option>All shipping</option><option>Included</option><option>Separate</option></select><Icon name="chevron" size={15} /></label>
                 <label className="select-wrap"><select value={marginFilter} onChange={(event) => setMarginFilter(event.target.value)}><option>All margins</option><option>Under 35%</option><option>35% and up</option></select><Icon name="chevron" size={15} /></label>
+                <button className="export" type="button" onClick={() => { setShowAllProducts((value) => !value); setPage(1); }}>{showAllProducts ? 'Paginer' : 'Voir toute la liste'}</button>
+                {fx?.rate && <button className="export" type="button" onClick={applyExchangeRate} disabled={fxApplying}>{fxApplying ? 'Actualisation…' : `Valider FX ${fx.rate} · ${fx.date}`}</button>}
                 <span className="result-count">{filtered.length} shown · Priority first</span>
               </div>
               <div className="table-wrap">
                 <table>
-                  <thead><tr><th className="product-col">Product / brand</th><th>Store</th><th>Currency</th><th>CJ cost USD</th><th>Shipping USD</th><th>Sale price</th><th>Update WooCommerce price</th><th>Temu</th><th>Amazon</th><th>Route & ETA</th><th>Stock</th><th>Margin</th><th>Sync</th><th /></tr></thead>
+                  <thead><tr><th className="product-col">Product / brand</th><th>Store</th><th>Currency</th><th>CJ cost USD</th><th>Shipping USD</th><th>Sale price</th><th>Variation FX</th><th>Update WooCommerce price</th><th>Temu</th><th>Amazon</th><th>Route & ETA</th><th>Stock</th><th>Margin</th><th>Editor (Clerk)</th><th>Sync</th><th /></tr></thead>
                   <tbody>{pageProducts.map((product) => {
                     const margin = calculateProductMargin(product);
                     const percent = Math.round(margin.marginRate * 100);
@@ -870,7 +891,8 @@ export default function ProductControl() {
                         <td><span className="currency-pill">{product.saleCurrency}</span></td>
                         <td className="number"><strong>{formatCurrency(product.cjCostUsd, 'USD')}</strong><small>{product.cjSku || product.pid}</small></td>
                         <td><strong>{Number(product.shippingUsd) > 0 ? formatCurrency(product.shippingUsd, 'USD') : 'Not confirmed'}</strong><small>{product.shippingDestination} · {product.minDeliveryDays}-{product.maxDeliveryDays} days</small></td>
-                        <td className="number">{publishedCurrent ? <><small className="new-sale-label">New sale price</small><strong className="new-sale-price">{formatCurrency(product.salePrice, product.saleCurrency)}</strong><small className="old-sale-price">Old: {formatCurrency(product.wooPricePublication.previousPrice ?? product.previousSalePrice ?? product.sourcePrice, product.saleCurrency)}</small></> : <strong>{formatCurrency(product.salePrice, product.saleCurrency)}</strong>}{product.saleCurrency === 'MXN' && <small className="usd-equivalent">≈ {formatCurrency(audit.saleUsd, 'USD')} · FX {product.exchangeRate}</small>}<small className={product.shippingIncluded ? 'included' : 'separate'}>{product.shippingIncluded === true ? '● Shipping included in sale price' : product.shippingIncluded === false ? '○ Shipping charged separately' : 'Shipping inclusion unconfirmed'}</small><small>Origin: {formatCurrency(product.sourcePrice, product.sourceCurrency)}{product.sourceCurrency !== product.saleCurrency ? ` · FX ${product.exchangeRate}` : ''}</small></td>
+                        <td className="number">{publishedCurrent ? <><small className="new-sale-label">New sale price</small><strong className="new-sale-price">{formatCurrency(product.salePrice, product.saleCurrency)}</strong><small className="old-sale-price">Old: {formatCurrency(product.wooPricePublication.previousPrice ?? product.previousSalePrice ?? product.sourcePrice, product.saleCurrency)}</small></> : <strong className="new-sale-price">{formatCurrency(product.salePrice, product.saleCurrency)}</strong>}{product.saleCurrency === 'MXN' && <small className="usd-equivalent">≈ {formatCurrency(audit.saleUsd, 'USD')} · FX {product.exchangeRate}</small>}<small className={product.shippingIncluded ? 'included' : 'separate'}>{product.shippingIncluded === true ? '● Shipping included in sale price' : product.shippingIncluded === false ? '○ Shipping charged separately' : 'Shipping inclusion unconfirmed'}</small><small>Origin: {formatCurrency(product.sourcePrice, product.sourceCurrency)}{product.sourceCurrency !== product.saleCurrency ? ` · FX ${product.exchangeRate}` : ''}</small></td>
+                        <td className="number"><strong className="new-sale-price">{product.sourceCurrency === 'USD' && product.saleCurrency === 'MXN' ? `${formatCurrency(product.sourcePrice, 'USD')} × ${product.exchangeRate} = ${formatCurrency(product.salePrice, 'MXN')}` : 'Sans conversion'}</strong><small>{product.fxRateDate ? `Taux du ${product.fxRateDate}` : 'Taux historique'}</small></td>
                         <CjPriceCell key={`${product.id}-${product.saleCurrency}-${product.cjPriceProposal?.savedAt || 'new'}`} product={product} onSaved={savePriceProposal} onPublished={confirmWooPricePublication} disabled={syncing || importingWp} />
                         {['Temu', 'Amazon'].map((competitorName) => {
                           const offer = product.competitors?.[competitorName.toLowerCase()];
@@ -881,11 +903,12 @@ export default function ProductControl() {
                         <td><strong className="route">{product.shippingOrigin} <span>→</span> {product.shippingDestination}</strong><small>{product.transportMethod} · {product.minDeliveryDays}-{product.maxDeliveryDays} days</small></td>
                         <td><strong className={product.stock <= 10 ? 'danger-text' : ''}>{product.stock}</strong><small>{product.stock <= 10 ? 'Low stock' : 'Available'}</small></td>
                         <td><div className={`margin-ring ${percent < 35 ? 'warning' : ''}`} style={{ '--margin': `${Math.max(0, Math.min(100, percent)) * 3.6}deg` }}><span>{percent}%</span></div><small>{formatCurrency(margin.profit, margin.saleCurrency)}</small></td>
+                        <td><strong>{product.editor || 'System'}</strong><small>{product.fxUpdatedAt ? new Date(product.fxUpdatedAt).toLocaleString() : 'Import'}</small></td>
                         <td><small>{product.lastCjSyncAt ? new Date(product.lastCjSyncAt).toLocaleString() : 'Never'}</small>{Boolean(product.cjChangeReport?.length) && <small className="danger-text">{product.cjChangeReport.length} changes</small>}</td>
                         <td><button className="row-menu" onClick={() => openEditProduct(product)} aria-label={`Edit ${product.name}`}><Icon name="dots" /></button></td>
                       </tr>
                     );
-                  })}{!pageProducts.length && <tr><td colSpan={14} className="empty">No products match these filters.</td></tr>}</tbody>
+                  })}{!pageProducts.length && <tr><td colSpan={16} className="empty">No products match these filters.</td></tr>}</tbody>
                 </table>
               </div>
               <footer className="table-footer"><span>Showing {pageProducts.length} of {filtered.length} products</span><div><button disabled={page === 1} onClick={() => setPage(page - 1)}>←</button>{Array.from({ length: totalPages }).slice(0, 5).map((_, index) => <button key={index + 1} className={page === index + 1 ? 'page-active' : ''} onClick={() => setPage(index + 1)}>{index + 1}</button>)}<button disabled={page === totalPages} onClick={() => setPage(page + 1)}>→</button></div></footer>
