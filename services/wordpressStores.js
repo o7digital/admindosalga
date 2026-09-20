@@ -92,17 +92,27 @@ const fetchStoreProducts = async (source) => {
 
 const mapWooProduct = (product, source) => {
   const category = product.categories?.[0]?.name || 'General';
+  const categorySlug = product.categories?.[0]?.slug || '';
+  const isCapsNativeMx = source.id === 'dosalga-mexico'
+    && (categorySlug.toLowerCase() === 'caps' || category.trim().toLowerCase() === 'caps');
   const isInStock = product.is_in_stock ?? product.stock_status === 'instock';
   const stock = product.stock_quantity ?? (isInStock ? 25 : 0);
   const storefrontPrice = asNumber(product.price);
-  const rawPrice = storefrontPrice || asNumber(product.prices?.price || product.sale_price || product.regular_price);
+  const rawPrice = isCapsNativeMx
+    ? asNumber(product.prices?.price || product.sale_price || product.regular_price)
+    : (storefrontPrice || asNumber(product.prices?.price || product.sale_price || product.regular_price));
   const minorUnit = Number(product.prices?.currency_minor_unit ?? 2);
-  const storePrice = storefrontPrice ? rawPrice : rawPrice / (10 ** minorUnit);
+  const storePrice = !isCapsNativeMx && storefrontPrice ? rawPrice : rawPrice / (10 ** minorUnit);
   const salePrice = Number(storePrice.toFixed(2));
-  const importedCurrency = normalizeCurrency(getMeta(product, 'dosalga_price_display_currency') || product.prices?.currency_code, source.currency);
-  const sourceCurrency = normalizeCurrency(getMeta(product, 'dosalga_price_source_currency'), importedCurrency);
+  const nativeWooCurrency = normalizeCurrency(product.prices?.currency_code, source.currency);
+  const importedCurrency = isCapsNativeMx
+    ? nativeWooCurrency
+    : normalizeCurrency(getMeta(product, 'dosalga_price_display_currency') || nativeWooCurrency, source.currency);
+  const sourceCurrency = isCapsNativeMx
+    ? importedCurrency
+    : normalizeCurrency(getMeta(product, 'dosalga_price_source_currency'), importedCurrency);
   const importedExchangeRate = asNumber(getMeta(product, 'dosalga_mxn_per_usd')) || exchangeRate;
-  const sourcePrice = sourceCurrency !== importedCurrency && product.prices?.price
+  const sourcePrice = !isCapsNativeMx && sourceCurrency !== importedCurrency && product.prices?.price
     ? Number((asNumber(product.prices.price) / (10 ** minorUnit)).toFixed(2))
     : salePrice;
   const image = Array.isArray(product.images) ? product.images[0] : product.images;
@@ -135,7 +145,8 @@ const mapWooProduct = (product, source) => {
     sourcePrice,
     sourceCurrency,
     importedCurrency,
-    importedCurrencySource: product.meta_data?.length ? 'dosalga.online.product.price + meta_data' : 'woocommerce.prices.currency_code',
+    importedCurrencySource: isCapsNativeMx ? 'woocommerce.prices.currency_code · CAPS native MXN rule' : product.meta_data?.length ? 'dosalga.online.product.price + meta_data' : 'woocommerce.prices.currency_code',
+    priceImportRule: isCapsNativeMx ? 'caps-native-mxn-v1' : 'storefront-display-price',
     expectedStoreCurrency: source.currency,
     currencyMismatch: importedCurrency !== source.currency,
     exchangeRate: importedExchangeRate,
