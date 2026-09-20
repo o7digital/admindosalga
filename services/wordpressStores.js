@@ -22,6 +22,11 @@ const asNumber = (value) => {
   return Number.isFinite(numeric) ? numeric : 0;
 };
 
+const normalizeCurrency = (value, fallback) => {
+  const currency = String(value || '').trim().toUpperCase();
+  return /^[A-Z]{3}$/.test(currency) ? currency : fallback;
+};
+
 const exchangeRate = Number(process.env.USD_MXN_RATE) || 17.49;
 
 const getMeta = (product, key) => {
@@ -74,6 +79,7 @@ const mapWooProduct = (product, source) => {
   const minorUnit = Number(product.prices?.currency_minor_unit ?? 2);
   const storePrice = rawPrice / (10 ** minorUnit);
   const salePrice = Number(storePrice.toFixed(2));
+  const importedCurrency = normalizeCurrency(product.prices?.currency_code, source.currency);
   const image = Array.isArray(product.images) ? product.images[0] : product.images;
   const imageUrl = image?.thumbnail || image?.src || '';
   const cjCostUsd = asNumber(getMeta(product, 'cj_cost_usd') || getMeta(product, '_cj_cost_usd') || getMeta(product, 'cj_cost') || getMeta(product, '_cj_cost'));
@@ -100,9 +106,13 @@ const mapWooProduct = (product, source) => {
     cjCostUsd,
     cjCostCurrency: 'USD',
     salePrice,
-    saleCurrency: source.currency,
+    saleCurrency: importedCurrency,
     sourcePrice: salePrice,
-    sourceCurrency: source.currency,
+    sourceCurrency: importedCurrency,
+    importedCurrency,
+    importedCurrencySource: 'woocommerce.prices.currency_code',
+    expectedStoreCurrency: source.currency,
+    currencyMismatch: importedCurrency !== source.currency,
     exchangeRate,
     shippingIncluded: true,
     shippingCost: shippingUsd,

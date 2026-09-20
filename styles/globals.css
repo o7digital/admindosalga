@@ -185,6 +185,8 @@ td small { margin-top: 5px; color: #96989d; font-size: 8px; white-space: nowrap;
 .market-badge { display: inline-flex; align-items: center; gap: 5px; padding: 5px 7px; border: 1px solid #e5e2de; color: #5c5f64; border-radius: 4px; font-size: 8px; font-weight: 700; white-space: nowrap; }
 .market-badge .flag { width: 12px; height: 8px; }
 .currency-pill { display: inline-block; padding: 4px 6px; background: #f0f0ee; color: #56595e; font-size: 8px; font-weight: 800; }
+.currency-pill.currency-mismatch { color: #fff; background: #b01828; }
+.currency-source { color: #686b72 !important; font-size: 8px !important; font-weight: 700; }
 .included { color: var(--green); }
 .separate { color: #9b6b3c; }
 .danger-text { color: #bb3a43 !important; }
