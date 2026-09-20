@@ -286,6 +286,14 @@ export default function ProductControl() {
   const [competitorEditor, setCompetitorEditor] = useState(null);
   const [savingCompetitor, setSavingCompetitor] = useState(false);
   const [blockingProductId, setBlockingProductId] = useState('');
+  const [pricingRulesOpen, setPricingRulesOpen] = useState(false);
+  const [pricingRules, setPricingRules] = useState([]);
+  const [pricingRulesLoading, setPricingRulesLoading] = useState(false);
+  const [savingPricingRule, setSavingPricingRule] = useState(false);
+  const [pricingRuleDraft, setPricingRuleDraft] = useState({
+    storeCode: 'MX', categorySlug: 'caps', sourceCurrency: 'MXN', displayCurrency: 'MXN',
+    priceMode: 'native', exchangeRate: 1, active: true, notes: '',
+  });
   const clerkEnabled = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
   const editorName = () => window.Clerk?.user?.fullName || window.Clerk?.user?.primaryEmailAddress?.emailAddress || 'System';
 
@@ -465,6 +473,46 @@ export default function ProductControl() {
   const notify = (message) => {
     setToast(message);
     setTimeout(() => setToast(''), 3500);
+  };
+
+  const openPricingRules = async () => {
+    setPricingRulesOpen(true);
+    setPricingRulesLoading(true);
+    setError('');
+    try {
+      const response = await fetch('/api/pricing-rules', { cache: 'no-store' });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || 'Pricing rules could not be loaded.');
+      setPricingRules(result.rules || []);
+      const current = (result.rules || []).find((rule) => rule.storeCode === 'MX' && rule.categorySlug === 'caps');
+      if (current) setPricingRuleDraft(current);
+    } catch (loadError) {
+      setError(loadError.message || 'Pricing rules could not be loaded.');
+    } finally {
+      setPricingRulesLoading(false);
+    }
+  };
+
+  const savePricingRule = async (event) => {
+    event.preventDefault();
+    setSavingPricingRule(true);
+    setError('');
+    try {
+      const response = await fetch('/api/pricing-rules', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(pricingRuleDraft),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || 'Pricing rule could not be saved.');
+      setPricingRules((current) => [...current.filter((rule) => !(rule.storeCode === result.rule.storeCode && rule.categorySlug === result.rule.categorySlug)), result.rule]);
+      setPricingRuleDraft(result.rule);
+      notify(`Rule saved · ${result.rule.storeCode} · ${result.rule.categorySlug}`);
+    } catch (saveError) {
+      setError(saveError.message || 'Pricing rule could not be saved.');
+    } finally {
+      setSavingPricingRule(false);
+    }
   };
 
   const updateField = (field, value) => setEditingProduct((current) => ({ ...current, [field]: value }));
@@ -802,7 +850,7 @@ export default function ProductControl() {
               {activeView === 'Sponsors' ? <div className="title-actions"><button className="btn secondary" onClick={() => notify('Stripe payments preview opened')}><Icon name="card" /> Stripe payments</button><button className="btn primary" onClick={() => notify('New campaign builder opened')}><Icon name="plus" /> New campaign</button></div>
                 : activeView === 'Socios' ? <div className="title-actions"><button className="btn secondary" onClick={() => notify('Stripe subscriptions opened')}><Icon name="card" /> Subscriptions</button><button className="btn primary" onClick={() => notify('Socio rental created')}><Icon name="users" /> New rental</button></div>
                   : activeView === 'Orders' ? <div className="title-actions"><button className="btn primary" onClick={loadOrders} disabled={ordersLoading}><Icon name="refresh" /> {ordersLoading ? 'Loading…' : 'Refresh Woo orders'}</button></div>
-                    : <div className="title-actions"><button className="btn secondary" onClick={importWordPress} disabled={importingWp}><Icon name="upload" />{importingWp ? 'Importing...' : 'Import WP'}</button><button className="btn secondary" onClick={syncCj} disabled={syncing}><span className={syncing ? 'spin' : ''}><Icon name="refresh" /></span>{syncButtonLabel}</button><button className="btn primary" onClick={openNewProduct}><Icon name="plus" /> Add product</button></div>}
+                    : <div className="title-actions"><button className="btn secondary" onClick={importWordPress} disabled={importingWp}><Icon name="upload" />{importingWp ? 'Importing...' : 'Import WP'}</button><button className="btn secondary" onClick={openPricingRules}><Icon name="chart" /> Price rules</button><button className="btn secondary" onClick={syncCj} disabled={syncing}><span className={syncing ? 'spin' : ''}><Icon name="refresh" /></span>{syncButtonLabel}</button><button className="btn primary" onClick={openNewProduct}><Icon name="plus" /> Add product</button></div>}
             </div>
 
             {!isGrowthWorkspace && activeView !== 'Orders' && <div className="metrics">
@@ -957,6 +1005,25 @@ export default function ProductControl() {
                 <div className="preview-margin"><span>Estimated margin</span><strong>{formatPercent(currentMargin.marginRate)}</strong><small>{formatCurrency(currentMargin.profit, currentMargin.saleCurrency)} net · sale price - CJ cost{editingProduct.shippingIncluded ? ' - included shipping' : ''}</small></div>
               </div>
               <div className="modal-actions">{editingProduct.id && <button type="button" className="btn danger" onClick={() => archiveProduct(editingProduct)}>Archive</button>}<button type="button" className="btn secondary" onClick={() => setModalOpen(false)}>Cancel</button><button className="btn primary" type="submit">{editingProduct.id ? 'Save product' : 'Create product'}</button></div>
+            </form>
+          </div>
+        )}
+        {pricingRulesOpen && (
+          <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && setPricingRulesOpen(false)}>
+            <form className="modal pricing-rules-modal" role="dialog" aria-modal="true" aria-labelledby="pricing-rules-title" onSubmit={savePricingRule}>
+              <div className="modal-head"><div><span>CATALOGUE CONTROL</span><h2 id="pricing-rules-title">Price rules</h2></div><button type="button" onClick={() => setPricingRulesOpen(false)} aria-label="Close"><Icon name="close" /></button></div>
+              <div className="modal-body">
+                <p className="history-note">These rules are stored in Railway PostgreSQL and applied during the next WP import. They prevent storefront conversions from being applied twice.</p>
+                {pricingRulesLoading ? <p className="history-note">Loading rules…</p> : <>
+                  <div className="form-grid"><label>Store<select value={pricingRuleDraft.storeCode} onChange={(event) => setPricingRuleDraft((current) => ({ ...current, storeCode: event.target.value }))}><option value="MX">Dosalga México</option><option value="US">Dosalga USA</option></select></label><label>Category slug<input required value={pricingRuleDraft.categorySlug} onChange={(event) => setPricingRuleDraft((current) => ({ ...current, categorySlug: event.target.value }))} placeholder="caps" /></label></div>
+                  <div className="form-grid"><label>Imported/source currency<select value={pricingRuleDraft.sourceCurrency} onChange={(event) => setPricingRuleDraft((current) => ({ ...current, sourceCurrency: event.target.value }))}><option>MXN</option><option>USD</option></select></label><label>Dashboard/display currency<select value={pricingRuleDraft.displayCurrency} onChange={(event) => setPricingRuleDraft((current) => ({ ...current, displayCurrency: event.target.value }))}><option>MXN</option><option>USD</option></select></label></div>
+                  <div className="form-grid"><label>Price mode<select value={pricingRuleDraft.priceMode} onChange={(event) => setPricingRuleDraft((current) => ({ ...current, priceMode: event.target.value }))}><option value="native">Native Woo price</option><option value="storefront">Storefront display price</option><option value="convert">Convert source price</option></select></label><label>Exchange rate<input type="number" min="0.000001" step="0.000001" required value={pricingRuleDraft.exchangeRate} onChange={(event) => setPricingRuleDraft((current) => ({ ...current, exchangeRate: event.target.value }))} /></label></div>
+                  <label className="rule-checkbox"><input type="checkbox" checked={pricingRuleDraft.active !== false} onChange={(event) => setPricingRuleDraft((current) => ({ ...current, active: event.target.checked }))} /> Apply this rule on the next import</label>
+                  <label>Notes<textarea value={pricingRuleDraft.notes || ''} onChange={(event) => setPricingRuleDraft((current) => ({ ...current, notes: event.target.value }))} rows="3" placeholder="Why this category uses native MXN…" /></label>
+                  <div className="pricing-rule-list"><strong>Saved rules</strong>{pricingRules.length ? pricingRules.map((rule) => <button type="button" key={`${rule.storeCode}-${rule.categorySlug}`} onClick={() => setPricingRuleDraft(rule)}><span>{rule.storeCode} · {rule.categorySlug}</span><small>{rule.priceMode} · {rule.sourceCurrency} → {rule.displayCurrency}</small></button>) : <small>No saved rules yet.</small>}</div>
+                </>}
+              </div>
+              <div className="modal-actions"><button type="button" className="btn secondary" onClick={() => setPricingRulesOpen(false)}>Close</button><button className="btn primary" type="submit" disabled={savingPricingRule || pricingRulesLoading}>{savingPricingRule ? 'Saving…' : 'Save rule'}</button></div>
             </form>
           </div>
         )}

@@ -1,4 +1,5 @@
-import { normalizeWooPrice } from '../lib/wooPricing.mjs';
+import { convertSourcePrice, normalizeWooPrice } from '../lib/wooPricing.mjs';
+import { getPricingRules, pricingRuleForProduct } from '../lib/pricingRules';
 
 const storeSources = [
   {
@@ -90,31 +91,36 @@ const fetchStoreProducts = async (source) => {
   return pages.flatMap((page) => page.products);
 };
 
-const mapWooProduct = (product, source) => {
+const mapWooProduct = (product, source, rules = []) => {
   const category = product.categories?.[0]?.name || 'General';
   const categorySlug = product.categories?.[0]?.slug || '';
-  const isCapsNativeMx = source.id === 'dosalga-mexico'
-    && (categorySlug.toLowerCase() === 'caps' || category.trim().toLowerCase() === 'caps');
+  const pricingRule = pricingRuleForProduct({ ...product, siteId: source.id, categorySlug }, rules);
+  const useNativePrice = pricingRule?.priceMode === 'native';
   const isInStock = product.is_in_stock ?? product.stock_status === 'instock';
   const stock = product.stock_quantity ?? (isInStock ? 25 : 0);
   const storefrontPrice = asNumber(product.price);
-  const rawPrice = isCapsNativeMx
+  const rawPrice = useNativePrice
     ? asNumber(product.prices?.price || product.sale_price || product.regular_price)
     : (storefrontPrice || asNumber(product.prices?.price || product.sale_price || product.regular_price));
   const minorUnit = Number(product.prices?.currency_minor_unit ?? 2);
-  const storePrice = !isCapsNativeMx && storefrontPrice ? rawPrice : rawPrice / (10 ** minorUnit);
-  const salePrice = Number(storePrice.toFixed(2));
+  const storePrice = !useNativePrice && storefrontPrice ? rawPrice : rawPrice / (10 ** minorUnit);
+  const storefrontSalePrice = Number(storePrice.toFixed(2));
   const nativeWooCurrency = normalizeCurrency(product.prices?.currency_code, source.currency);
-  const importedCurrency = isCapsNativeMx
-    ? nativeWooCurrency
+  const importedCurrency = useNativePrice
+    ? normalizeCurrency(pricingRule.displayCurrency, nativeWooCurrency)
     : normalizeCurrency(getMeta(product, 'dosalga_price_display_currency') || nativeWooCurrency, source.currency);
-  const sourceCurrency = isCapsNativeMx
-    ? importedCurrency
+  const sourceCurrency = useNativePrice
+    ? normalizeCurrency(pricingRule.sourceCurrency, importedCurrency)
     : normalizeCurrency(getMeta(product, 'dosalga_price_source_currency'), importedCurrency);
-  const importedExchangeRate = asNumber(getMeta(product, 'dosalga_mxn_per_usd')) || exchangeRate;
-  const sourcePrice = !isCapsNativeMx && sourceCurrency !== importedCurrency && product.prices?.price
+  const importedExchangeRate = Number(pricingRule?.exchangeRate) > 0
+    ? Number(pricingRule.exchangeRate)
+    : asNumber(getMeta(product, 'dosalga_mxn_per_usd')) || exchangeRate;
+  const sourcePrice = useNativePrice || (sourceCurrency !== importedCurrency && product.prices?.price)
     ? Number((asNumber(product.prices.price) / (10 ** minorUnit)).toFixed(2))
-    : salePrice;
+    : storefrontSalePrice;
+  const salePrice = useNativePrice
+    ? convertSourcePrice(sourcePrice, sourceCurrency, importedCurrency, importedExchangeRate)
+    : Number(storePrice.toFixed(2));
   const image = Array.isArray(product.images) ? product.images[0] : product.images;
   const imageUrl = image?.thumbnail || image?.src || '';
   const cjCostUsd = asNumber(getMeta(product, 'cj_cost_usd') || getMeta(product, '_cj_cost_usd') || getMeta(product, 'cj_cost') || getMeta(product, '_cj_cost'));
@@ -145,8 +151,8 @@ const mapWooProduct = (product, source) => {
     sourcePrice,
     sourceCurrency,
     importedCurrency,
-    importedCurrencySource: isCapsNativeMx ? 'woocommerce.prices.currency_code · CAPS native MXN rule' : product.meta_data?.length ? 'dosalga.online.product.price + meta_data' : 'woocommerce.prices.currency_code',
-    priceImportRule: isCapsNativeMx ? 'caps-native-mxn-v1' : 'storefront-display-price',
+    importedCurrencySource: useNativePrice ? `pricing rule · ${pricingRule.categorySlug}` : product.meta_data?.length ? 'dosalga.online.product.price + meta_data' : 'woocommerce.prices.currency_code',
+    priceImportRule: useNativePrice ? `${pricingRule.categorySlug}-native-${String(importedCurrency).toLowerCase()}-v1` : 'storefront-display-price',
     expectedStoreCurrency: source.currency,
     currencyMismatch: importedCurrency !== source.currency,
     exchangeRate: importedExchangeRate,
@@ -173,11 +179,12 @@ const mapWooProduct = (product, source) => {
 };
 
 export const importWordPressStores = async () => {
+  const pricingRules = await getPricingRules();
   const imports = await Promise.all(storeSources.map(async (source) => {
     const products = await fetchStoreProducts(source);
     return {
       source,
-      products: products.map((product) => normalizeWooPrice(mapWooProduct(product, source))),
+      products: products.map((product) => normalizeWooPrice(mapWooProduct(product, source, pricingRules))),
     };
   }));
 

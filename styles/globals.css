@@ -393,6 +393,18 @@ button.insight-row:hover { color: var(--red-dark); }
 .preview-margin small { margin-top: 4px; color: #777a80; font-size: 8px; }
 .modal-actions { padding: 14px 22px; background: #f8f7f5; border-top: 1px solid var(--line); display: flex; justify-content: flex-end; gap: 8px; }
 .competitor-modal { width: min(580px, 100%); }
+.pricing-rules-modal { width: min(640px, 100%); }
+.modal textarea { width: 100%; border: 1px solid #dedbd6; background: #fcfcfb; padding: 10px; color: #333; outline: 0; resize: vertical; font-size: 10px; }
+.modal textarea:focus { border-color: #999; box-shadow: 0 0 0 3px #f1f0ed; }
+.rule-checkbox { display: flex !important; grid-template-columns: auto 1fr; align-items: center; gap: 8px !important; }
+.rule-checkbox input { width: auto; height: auto; accent-color: var(--green); }
+.pricing-rule-list { border-top: 1px solid var(--line); padding-top: 13px; display: grid; gap: 7px; }
+.pricing-rule-list > strong { font-size: 10px; color: #42454a; }
+.pricing-rule-list > small { color: #8a8d93; font-size: 9px; }
+.pricing-rule-list button { border: 1px solid #e4e1dc; background: #fff; padding: 8px 10px; display: flex; justify-content: space-between; align-items: center; text-align: left; gap: 12px; }
+.pricing-rule-list button:hover { border-color: var(--red); background: #fff8f7; }
+.pricing-rule-list button span { color: #34363b; font-size: 9px; font-weight: 800; }
+.pricing-rule-list button small { color: #85888d; font-size: 8px; }
 .competitor-product { display: flex; align-items: center; gap: 12px; padding: 12px; background: #f8f7f5; border: 1px solid var(--line); }
 .competitor-product strong, .competitor-product span { display: block; }
 .competitor-product strong { font-size: 11px; }

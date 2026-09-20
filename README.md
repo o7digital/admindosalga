@@ -83,6 +83,12 @@ nombre de fiches produits. Les imports WooCommerce et les synchronisations CJ so
 dans PostgreSQL. Les deux WordPress restent les seules boutiques; Railway ne crée aucun
 WordPress supplémentaire.
 
+Les règles de prix par boutique et catégorie sont enregistrées dans `pricing_rules` sur
+Railway. Le bouton « Price rules » de l'admin permet de choisir la devise source, la devise
+affichée, le taux et le mode de lecture (`Native Woo price`, `Storefront display price` ou
+`Convert source price`). La règle MX / `caps` est initialisée en `native` + MXN : elle lit
+le montant WooCommerce natif et n'applique jamais la conversion USD/MXN du storefront.
+
 Champs principaux:
 - `cjCost`: cout produit chez CJ
 - `cjCostCurrency`: devise du cout CJ
