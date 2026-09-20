@@ -290,6 +290,7 @@ export default function ProductControl() {
   const [pricingRules, setPricingRules] = useState([]);
   const [pricingRulesLoading, setPricingRulesLoading] = useState(false);
   const [savingPricingRule, setSavingPricingRule] = useState(false);
+  const [repairingCaps, setRepairingCaps] = useState(false);
   const [pricingRuleDraft, setPricingRuleDraft] = useState({
     storeCode: 'MX', categorySlug: 'caps', sourceCurrency: 'MXN', displayCurrency: 'MXN',
     priceMode: 'native', exchangeRate: 1, active: true, notes: '',
@@ -512,6 +513,26 @@ export default function ProductControl() {
       setError(saveError.message || 'Pricing rule could not be saved.');
     } finally {
       setSavingPricingRule(false);
+    }
+  };
+
+  const repairCapsInWordPress = async () => {
+    if (!window.confirm('Corriger la devise de toute la catégorie CAPS dans WooCommerce MX ? Les montants natifs ne seront pas modifiés.')) return;
+    setRepairingCaps(true);
+    setError('');
+    try {
+      const response = await fetch('/api/woocommerce/repair-category-currency', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ market: 'MX', categorySlug: 'caps' }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || 'WooCommerce category repair failed.');
+      notify(result.message || `CAPS repaired · ${result.repairedCount} products`);
+    } catch (repairError) {
+      setError(repairError.message || 'WooCommerce category repair failed.');
+    } finally {
+      setRepairingCaps(false);
     }
   };
 
@@ -1020,6 +1041,7 @@ export default function ProductControl() {
                   <div className="form-grid"><label>Price mode<select value={pricingRuleDraft.priceMode} onChange={(event) => setPricingRuleDraft((current) => ({ ...current, priceMode: event.target.value }))}><option value="native">Native Woo price</option><option value="storefront">Storefront display price</option><option value="convert">Convert source price</option></select></label><label>Exchange rate<input type="number" min="0.000001" step="0.000001" required value={pricingRuleDraft.exchangeRate} onChange={(event) => setPricingRuleDraft((current) => ({ ...current, exchangeRate: event.target.value }))} /></label></div>
                   <label className="rule-checkbox"><input type="checkbox" checked={pricingRuleDraft.active !== false} onChange={(event) => setPricingRuleDraft((current) => ({ ...current, active: event.target.checked }))} /> Apply this rule on the next import</label>
                   <label>Notes<textarea value={pricingRuleDraft.notes || ''} onChange={(event) => setPricingRuleDraft((current) => ({ ...current, notes: event.target.value }))} rows="3" placeholder="Why this category uses native MXN…" /></label>
+                  {pricingRuleDraft.storeCode === 'MX' && pricingRuleDraft.categorySlug === 'caps' && <div className="wp-repair-box"><strong>Correct the public MX CAPS catalogue</strong><p>This updates WooCommerce currency metadata so dosalga.online stops multiplying the native MXN amount by USD/MXN. Product amounts are not changed.</p><button type="button" className="btn danger" onClick={repairCapsInWordPress} disabled={repairingCaps}>{repairingCaps ? 'Updating WordPress…' : 'Apply CAPS MXN to WordPress'}</button></div>}
                   <div className="pricing-rule-list"><strong>Saved rules</strong>{pricingRules.length ? pricingRules.map((rule) => <button type="button" key={`${rule.storeCode}-${rule.categorySlug}`} onClick={() => setPricingRuleDraft(rule)}><span>{rule.storeCode} · {rule.categorySlug}</span><small>{rule.priceMode} · {rule.sourceCurrency} → {rule.displayCurrency}</small></button>) : <small>No saved rules yet.</small>}</div>
                 </>}
               </div>

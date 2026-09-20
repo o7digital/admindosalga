@@ -143,3 +143,58 @@ export const assignWooCategory = async (identity, categorySlug) => {
   }
   return { productId: verified.id, category: slug, categories: verified.categories };
 };
+
+export const repairWooCategoryCurrency = async ({ market = 'MX', categorySlug = 'caps', sourceCurrency = 'MXN', displayCurrency = 'MXN', exchangeRate = 1 } = {}) => {
+  const slug = String(categorySlug || '').trim().toLowerCase();
+  if (!slug) throw new Error('A WooCommerce category slug is required.');
+  if (!['MXN', 'USD'].includes(sourceCurrency) || !['MXN', 'USD'].includes(displayCurrency)) {
+    throw new Error('A valid source and display currency are required.');
+  }
+  const categories = await request(market, `/products/categories?slug=${encodeURIComponent(slug)}&per_page=100`);
+  const category = Array.isArray(categories) ? categories.find(item => item.slug === slug) : null;
+  if (!category) throw new Error(`WooCommerce category "${slug}" was not found.`);
+
+  const products = [];
+  for (let page = 1; page <= 50; page += 1) {
+    const batch = await request(market, `/products?category=${encodeURIComponent(category.id)}&per_page=100&page=${page}`);
+    if (!Array.isArray(batch) || batch.length === 0) break;
+    products.push(...batch);
+    if (batch.length < 100) break;
+  }
+
+  const repaired = [];
+  for (let offset = 0; offset < products.length; offset += 5) {
+    const batch = products.slice(offset, offset + 5);
+    const results = await Promise.all(batch.map(async (summary) => {
+      const product = await request(market, `/products/${encodeURIComponent(summary.id)}`);
+      const keys = new Set(['dosalga_price_source_currency', 'dosalga_price_display_currency', 'dosalga_mxn_per_usd']);
+      const meta = (product.meta_data || []).filter(item => !keys.has(item.key));
+      meta.push({ key: 'dosalga_price_source_currency', value: sourceCurrency });
+      meta.push({ key: 'dosalga_price_display_currency', value: displayCurrency });
+      meta.push({ key: 'dosalga_mxn_per_usd', value: String(exchangeRate) });
+      const updated = await request(market, `/products/${encodeURIComponent(summary.id)}`, {
+        method: 'PUT',
+        body: JSON.stringify({ meta_data: meta }),
+      });
+      const verifiedMeta = new Map((updated.meta_data || []).map(item => [item.key, item.value]));
+      if (verifiedMeta.get('dosalga_price_source_currency') !== sourceCurrency
+        || verifiedMeta.get('dosalga_price_display_currency') !== displayCurrency) {
+        throw new Error(`WooCommerce did not confirm currency metadata for product ${summary.id}.`);
+      }
+      return { id: updated.id, sku: updated.sku || summary.sku || '', name: updated.name || summary.name || '' };
+    }));
+    repaired.push(...results);
+  }
+
+  return {
+    market,
+    category: slug,
+    categoryId: category.id,
+    sourceCurrency,
+    displayCurrency,
+    exchangeRate: Number(exchangeRate),
+    repairedCount: repaired.length,
+    products: repaired,
+    message: `Updated ${repaired.length} WooCommerce products in ${slug}. Product amounts were not changed; storefront currency metadata was corrected.`,
+  };
+};

@@ -405,6 +405,10 @@ button.insight-row:hover { color: var(--red-dark); }
 .pricing-rule-list button:hover { border-color: var(--red); background: #fff8f7; }
 .pricing-rule-list button span { color: #34363b; font-size: 9px; font-weight: 800; }
 .pricing-rule-list button small { color: #85888d; font-size: 8px; }
+.wp-repair-box { padding: 13px; border: 2px solid #f0b6b2; background: #fff5f4; display: grid; gap: 7px; }
+.wp-repair-box strong { color: #8f1723; font-size: 10px; }
+.wp-repair-box p { margin: 0; color: #8a6263; font-size: 9px; line-height: 1.45; }
+.wp-repair-box .btn { justify-self: start; min-height: 34px; }
 .competitor-product { display: flex; align-items: center; gap: 12px; padding: 12px; background: #f8f7f5; border: 1px solid var(--line); }
 .competitor-product strong, .competitor-product span { display: block; }
 .competitor-product strong { font-size: 11px; }
