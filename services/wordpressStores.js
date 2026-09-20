@@ -5,6 +5,9 @@ const storeSources = [
     id: 'dosalga-mexico',
     name: 'Dosalga México',
     url: process.env.DOSALGA_MEXICO_WP_URL || 'https://wp-dosalga-mx.o7digitalgroup.com',
+    storefrontUrl: process.env.DOSALGA_MEXICO_STOREFRONT_URL || 'https://www.dosalga.online',
+    catalogPath: '/api/products',
+    catalogQuery: { lang: 'es', per_page: '24', orderby: 'date', order: 'desc' },
     currency: 'MXN',
     destination: 'México',
   },
@@ -35,11 +38,17 @@ const getMeta = (product, key) => {
 };
 
 const fetchStoreProducts = async (source) => {
+  const catalogUrl = source.catalogPath ? new URL(source.catalogPath, source.storefrontUrl) : null;
+  const pageSize = Number(source.catalogQuery?.per_page || 100);
   const fetchPage = async (page) => {
-    const url = new URL('/wp-json/wc/store/v1/products', source.url);
-    url.searchParams.set('per_page', '100');
+    const url = catalogUrl ? new URL(catalogUrl) : new URL('/wp-json/wc/store/v1/products', source.url);
+    if (catalogUrl) {
+      Object.entries(source.catalogQuery || {}).forEach(([key, value]) => url.searchParams.set(key, String(value)));
+    } else {
+      url.searchParams.set('per_page', '100');
+    }
     url.searchParams.set('page', String(page));
-    url.searchParams.set('_fields', 'id,name,permalink,sku,prices,images,categories,is_in_stock,low_stock_remaining');
+    if (!catalogUrl) url.searchParams.set('_fields', 'id,name,permalink,sku,prices,images,categories,is_in_stock,low_stock_remaining');
 
     const response = await fetch(url.toString(), {
       headers: { Accept: 'application/json' },
@@ -49,37 +58,53 @@ const fetchStoreProducts = async (source) => {
       throw new Error(`${source.name} returned ${response.status}`);
     }
 
-    const pageProducts = await response.json();
+    const payload = await response.json();
+    const pageProducts = catalogUrl ? payload.data : payload;
     if (!Array.isArray(pageProducts)) {
       throw new Error(`${source.name} returned an unexpected product payload`);
     }
 
     return {
       products: pageProducts,
-      totalPages: Number(response.headers.get('x-wp-totalpages')) || 1,
+      totalPages: Number(response.headers.get('x-wp-totalpages')) || null,
+      hasMore: catalogUrl ? pageProducts.length >= pageSize : false,
     };
   };
 
   const firstPage = await fetchPage(1);
-  const totalPages = Math.min(firstPage.totalPages, 10);
-  if (totalPages <= 1) return firstPage.products;
+  if (!catalogUrl) {
+    const totalPages = Math.min(firstPage.totalPages || 1, 10);
+    if (totalPages <= 1) return firstPage.products;
+    const remainingPages = await Promise.all(Array.from({ length: totalPages - 1 }, (_, index) => fetchPage(index + 2)));
+    return [firstPage, ...remainingPages].flatMap((page) => page.products);
+  }
 
-  const remainingPages = await Promise.all(
-    Array.from({ length: totalPages - 1 }, (_, index) => fetchPage(index + 2))
-  );
-
-  return [firstPage, ...remainingPages].flatMap((page) => page.products);
+  const pages = [firstPage];
+  let nextPage = 2;
+  while (pages[pages.length - 1].hasMore && nextPage <= 50) {
+    const batch = await Promise.all(Array.from({ length: 5 }, (_, index) => fetchPage(nextPage + index)));
+    pages.push(...batch);
+    if (batch.some((page) => page.products.length < pageSize)) break;
+    nextPage += batch.length;
+  }
+  return pages.flatMap((page) => page.products);
 };
 
 const mapWooProduct = (product, source) => {
   const category = product.categories?.[0]?.name || 'General';
   const isInStock = product.is_in_stock ?? product.stock_status === 'instock';
   const stock = product.stock_quantity ?? (isInStock ? 25 : 0);
-  const rawPrice = asNumber(product.prices?.price || product.price || product.sale_price || product.regular_price);
+  const storefrontPrice = asNumber(product.price);
+  const rawPrice = storefrontPrice || asNumber(product.prices?.price || product.sale_price || product.regular_price);
   const minorUnit = Number(product.prices?.currency_minor_unit ?? 2);
-  const storePrice = rawPrice / (10 ** minorUnit);
+  const storePrice = storefrontPrice ? rawPrice : rawPrice / (10 ** minorUnit);
   const salePrice = Number(storePrice.toFixed(2));
-  const importedCurrency = normalizeCurrency(product.prices?.currency_code, source.currency);
+  const importedCurrency = normalizeCurrency(getMeta(product, 'dosalga_price_display_currency') || product.prices?.currency_code, source.currency);
+  const sourceCurrency = normalizeCurrency(getMeta(product, 'dosalga_price_source_currency'), importedCurrency);
+  const importedExchangeRate = asNumber(getMeta(product, 'dosalga_mxn_per_usd')) || exchangeRate;
+  const sourcePrice = sourceCurrency !== importedCurrency && product.prices?.price
+    ? Number((asNumber(product.prices.price) / (10 ** minorUnit)).toFixed(2))
+    : salePrice;
   const image = Array.isArray(product.images) ? product.images[0] : product.images;
   const imageUrl = image?.thumbnail || image?.src || '';
   const cjCostUsd = asNumber(getMeta(product, 'cj_cost_usd') || getMeta(product, '_cj_cost_usd') || getMeta(product, 'cj_cost') || getMeta(product, '_cj_cost'));
@@ -107,13 +132,13 @@ const mapWooProduct = (product, source) => {
     cjCostCurrency: 'USD',
     salePrice,
     saleCurrency: importedCurrency,
-    sourcePrice: salePrice,
-    sourceCurrency: importedCurrency,
+    sourcePrice,
+    sourceCurrency,
     importedCurrency,
-    importedCurrencySource: 'woocommerce.prices.currency_code',
+    importedCurrencySource: product.meta_data?.length ? 'dosalga.online.product.price + meta_data' : 'woocommerce.prices.currency_code',
     expectedStoreCurrency: source.currency,
     currencyMismatch: importedCurrency !== source.currency,
-    exchangeRate,
+    exchangeRate: importedExchangeRate,
     shippingIncluded: true,
     shippingCost: shippingUsd,
     shippingUsd,
@@ -130,7 +155,7 @@ const mapWooProduct = (product, source) => {
     lastWooImportAt: now,
     lastCjSyncAt: null,
     cjChangeReport: [],
-    notes: `Imported from ${source.name} WooCommerce backend (${source.url}).`,
+    notes: `Imported from ${source.name} storefront (${source.storefrontUrl || source.url}); displayed currency ${importedCurrency}, source currency ${sourceCurrency}.`,
     createdAt: product.date_created ? new Date(product.date_created).toISOString() : now,
     updatedAt: product.date_modified ? new Date(product.date_modified).toISOString() : now,
   };
