@@ -68,6 +68,6 @@ export default function CjPriceCell({ product, onSaved, onPublished, disabled })
     {publishedCurrent && <p role="status" className="woo-confirmation">✓ Confirmed in WooCommerce: {formatCurrency(publication.price, publication.currency)}</p>}
     {publication && !publishedCurrent && publication.state !== 'woo_verified' && <p role="status" className="cj-price-note">{publication.message || 'WooCommerce publication in progress; do not resend.'}</p>}
     {saved && <small>Saved {new Date(saved.savedAt).toLocaleString()}</small>}
-    {error && <p className="danger-text" role="alert">{error}</p>}
+    {error && <p className="cj-price-error" role="alert"><strong>Échec de l’action</strong><span>{error}</span></p>}
   </form></td>;
 }

@@ -54,7 +54,11 @@ button { cursor: pointer; }
 .help-btn { font-size: 13px; font-weight: 700; }
 .alert-dot { position: absolute; width: 6px; height: 6px; background: var(--red); border: 2px solid white; box-sizing: content-box; border-radius: 50%; top: 5px; right: 6px; }
 .content { padding: 34px 32px 48px; max-width: 1620px; margin: 0 auto; }
-.error-banner { margin-bottom: 18px; padding: 12px 14px; border: 1px solid #f0b6b2; background: #fff1f0; color: #9f2a22; font-size: 12px; }
+.error-banner { margin-bottom: 18px; padding: 13px 44px 13px 15px; border: 2px solid #d52b38; background: #fff0f0; color: #8f1723; font-size: 12px; position: relative; display: grid; gap: 4px; animation: errorFlash .45s ease-out; box-shadow: 0 4px 18px rgba(197,35,49,.12); }
+.error-banner strong { color: #b01828; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
+.error-banner span { line-height: 1.45; }
+.error-banner button { position: absolute; top: 8px; right: 10px; border: 0; background: transparent; color: #a51927; font-size: 22px; line-height: 1; cursor: pointer; }
+@keyframes errorFlash { 0% { opacity: 0; transform: translateY(-5px); box-shadow: 0 0 0 8px rgba(213,43,56,.18); } 100% { opacity: 1; transform: translateY(0); box-shadow: 0 4px 18px rgba(197,35,49,.12); } }
 .title-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 25px; }
 .eyebrow { display: flex; align-items: center; gap: 8px; color: #84868b; font-weight: 800; font-size: 9px; letter-spacing: .16em; }
 .eyebrow span { width: 7px; height: 7px; background: var(--red); }
@@ -87,10 +91,17 @@ h1 { font-size: clamp(27px, 2.2vw, 38px); margin: 9px 0 4px; letter-spacing: 0; 
 .compact-card table { min-width: 760px; }
 .catalog-head { min-height: 58px; border-bottom: 1px solid var(--line); padding: 0 17px; display: flex; justify-content: space-between; align-items: center; gap: 16px; }
 .tabs { align-self: stretch; display: flex; gap: 5px; }
-.tab { position: relative; border: 0; background: transparent; color: #888a90; font-size: 10px; font-weight: 700; padding: 0 11px; }
+.tab { position: relative; border: 0; background: transparent; color: #888a90; font-size: 10px; font-weight: 700; padding: 0 13px; transition: .2s ease; }
+.tab:hover { color: var(--ink); background: #faf8f5; }
 .tab span { margin-left: 5px; color: #b0b2b6; }
 .tab.active { color: var(--ink); }
 .tab.active::after { content: ""; position: absolute; left: 10px; right: 10px; bottom: -1px; height: 2px; background: var(--red); }
+.tab.alert-tab { color: #a51927; }
+.tab.alert-tab span { color: #b01828; background: #fff0f0; border: 1px solid #f0b6b2; border-radius: 999px; padding: 3px 6px; }
+.tab.alert-tab.active { background: #fff0f0; color: #8f1723; }
+.tab.alert-tab.active::after { height: 4px; background: #c82333; }
+.tab.draft-tab.active { background: #fff8eb; color: #8d5a1f; }
+.tab.draft-tab.active::after { background: #d9974a; }
 .export { border: 1px solid #e4e1dd; background: white; border-radius: 7px; padding: 7px 10px; display: flex; gap: 7px; align-items: center; color: #606268; font-size: 10px; font-weight: 700; white-space: nowrap; }
 .filters { min-height: 60px; display: flex; align-items: center; gap: 8px; padding: 11px 17px; border-bottom: 1px solid var(--line); }
 .search-box { width: min(330px, 30vw); height: 36px; border: 1px solid #dedcd8; display: flex; align-items: center; gap: 9px; padding: 0 10px; background: #fbfbfa; border-radius: 7px; color: #989a9e; }
@@ -129,6 +140,10 @@ td small { margin-top: 5px; color: #96989d; font-size: 8px; white-space: nowrap;
 .cj-price-cell input:focus-visible, .cj-price-cell button:focus-visible { outline: 2px solid #276d55; outline-offset: 2px; }
 .cj-price-cell p { font-size: 10px; line-height: 1.4; }
 .cj-price-cell .woo-confirmation { margin: 7px 0 2px; padding: 7px; border-radius: 5px; background: #e8f7ef; color: #176b45; font-weight: 700; }
+.cj-price-error { margin: 8px 0 0; padding: 9px; border: 2px solid #d52b38; border-radius: 5px; background: #fff0f0; color: #a51927; line-height: 1.35; animation: errorFlash .45s ease-out; }
+.cj-price-error strong, .cj-price-error span { display: block; }
+.cj-price-error strong { font-size: 9px; text-transform: uppercase; letter-spacing: .05em; }
+.cj-price-error span { margin-top: 4px; font-size: 9px; }
 .new-sale-label, .new-sale-price { color: #1769d2 !important; }
 .new-sale-label { font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
 .old-sale-price { color: #b01828 !important; text-decoration: line-through; }

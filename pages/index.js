@@ -108,6 +108,12 @@ function marketFor(product) {
   return product.siteId === 'dosalga-usa' ? 'USA' : 'México';
 }
 
+function needsProductReview(product) {
+  return product.stock <= 10
+    || Boolean(product.cjChangeReport?.length)
+    || calculateProductMargin(product).marginRate < 0.25;
+}
+
 function ProductVisual({ product }) {
   const [source, setSource] = useState(product.imageUrl || '');
   const [fallbackAttempted, setFallbackAttempted] = useState(false);
@@ -257,6 +263,7 @@ export default function ProductControl() {
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [activeView, setActiveView] = useState('Products');
   const [market, setMarket] = useState('All');
+  const [productTab, setProductTab] = useState('all');
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('All categories');
   const [shippingFilter, setShippingFilter] = useState('All shipping');
@@ -350,7 +357,7 @@ export default function ProductControl() {
 
   const categories = useMemo(() => ['All categories', ...new Set(products.map((product) => product.category).filter(Boolean))], [products]);
 
-  const filtered = useMemo(() => products.filter((product) => {
+  const catalogFiltered = useMemo(() => products.filter((product) => {
     if (product.archived) return false;
     const productMarket = marketFor(product);
     const margin = calculateProductMargin(product).marginRate;
@@ -371,14 +378,21 @@ export default function ProductControl() {
       || compareProductPriority(a, b);
   }), [category, marginFilter, market, products, query, shippingFilter]);
 
-  useEffect(() => setPage(1), [category, marginFilter, market, query, shippingFilter]);
+  const filtered = useMemo(() => catalogFiltered.filter((product) => {
+    if (productTab === 'active') return product.status === 'approved' || product.status === 'ordered';
+    if (productTab === 'review') return needsProductReview(product);
+    if (productTab === 'drafts') return product.status === 'review';
+    return true;
+  }), [catalogFiltered, productTab]);
+
+  useEffect(() => setPage(1), [category, marginFilter, market, productTab, query, shippingFilter]);
 
   const metrics = useMemo(() => {
     const active = filtered.filter((product) => product.status !== 'archived');
     const included = active.filter((product) => product.shippingIncluded).length;
     const margins = active.map((product) => calculateProductMargin(product).marginRate);
     const averageMargin = margins.length ? margins.reduce((sum, value) => sum + value, 0) / margins.length : 0;
-    const attention = active.filter((product) => product.stock <= 10 || product.cjChangeReport?.length || calculateProductMargin(product).marginRate < 0.25).length;
+    const attention = active.filter(needsProductReview).length;
     return { active: active.length, included, averageMargin, attention };
   }, [filtered]);
 
@@ -670,19 +684,21 @@ export default function ProductControl() {
   const importWordPress = async () => {
     setImportingWp(true);
     setError('');
-    const response = await fetch('/api/wp/import', { method: 'POST' });
-    const result = await response.json();
-    setImportingWp(false);
-    if (!response.ok) {
-      setError(result.message || 'WordPress import failed.');
-      return;
+    try {
+      const response = await fetch('/api/wp/import', { method: 'POST' });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || 'WordPress import failed.');
+      const importedProducts = (result.products || []).map(normalizeProduct);
+      setProducts(importedProducts);
+      persistProducts(importedProducts);
+      if (result.persisted) await loadProducts();
+      const summary = (result.reports || []).map((report) => `${report.name}: ${report.count}`).join(' · ');
+      notify(`WordPress import completed · ${summary}`);
+    } catch (importError) {
+      setError(importError.message || 'WordPress import failed.');
+    } finally {
+      setImportingWp(false);
     }
-    const importedProducts = (result.products || []).map(normalizeProduct);
-    setProducts(importedProducts);
-    persistProducts(importedProducts);
-    if (result.persisted) await loadProducts();
-    const summary = (result.reports || []).map((report) => `${report.name}: ${report.count}`).join(' · ');
-    notify(`WordPress import completed · ${summary}`);
   };
 
   const exportCsv = () => {
@@ -779,7 +795,7 @@ export default function ProductControl() {
           </header>
 
           <div className="content">
-            {error && <div className="error-banner">{error}</div>}
+            {error && <div className="error-banner" role="alert"><strong>Action impossible</strong><span>{error}</span><button type="button" onClick={() => setError('')} aria-label="Close error">×</button></div>}
             <div className="title-row">
               <div><div className="eyebrow"><span /> {viewPresentation.eyebrow}</div><h1>{viewPresentation.title}</h1><p>{viewPresentation.subtitle}</p></div>
               {activeView === 'Sponsors' ? <div className="title-actions"><button className="btn secondary" onClick={() => notify('Stripe payments preview opened')}><Icon name="card" /> Stripe payments</button><button className="btn primary" onClick={() => notify('New campaign builder opened')}><Icon name="plus" /> New campaign</button></div>
@@ -865,7 +881,12 @@ export default function ProductControl() {
             )}
 
             {activeView === 'Products' && <section className="catalog-card">
-              <div className="catalog-head"><div className="tabs"><button className="tab active">All products <span>{filtered.length}</span></button><button className="tab">Active <span>{filtered.filter((p) => p.status === 'approved' || p.status === 'ordered').length}</span></button><button className="tab">Needs review <span>{metrics.attention}</span></button><button className="tab">Drafts <span>{filtered.filter((p) => p.status === 'review').length}</span></button></div><button className="export" onClick={exportCsv}><Icon name="upload" /> Export CSV</button></div>
+              <div className="catalog-head"><div className="tabs" role="tablist" aria-label="Product status filters">
+                <button type="button" role="tab" aria-selected={productTab === 'all'} className={`tab ${productTab === 'all' ? 'active' : ''}`} onClick={() => setProductTab('all')}>All products <span>{catalogFiltered.length}</span></button>
+                <button type="button" role="tab" aria-selected={productTab === 'active'} className={`tab ${productTab === 'active' ? 'active' : ''}`} onClick={() => setProductTab('active')}>Active <span>{catalogFiltered.filter((p) => p.status === 'approved' || p.status === 'ordered').length}</span></button>
+                <button type="button" role="tab" aria-selected={productTab === 'review'} className={`tab alert-tab ${productTab === 'review' ? 'active' : ''}`} onClick={() => setProductTab('review')}>Needs review <span>{catalogFiltered.filter(needsProductReview).length}</span></button>
+                <button type="button" role="tab" aria-selected={productTab === 'drafts'} className={`tab draft-tab ${productTab === 'drafts' ? 'active' : ''}`} onClick={() => setProductTab('drafts')}>Drafts <span>{catalogFiltered.filter((p) => p.status === 'review').length}</span></button>
+              </div><button className="export" onClick={exportCsv}><Icon name="upload" /> Export CSV</button></div>
               <div className="filters">
                 <label className="search-box"><Icon name="search" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search product, SKU or brand" /></label>
                 <label className="select-wrap"><select value={category} onChange={(event) => setCategory(event.target.value)}>{categories.map((item) => <option key={item}>{item}</option>)}</select><Icon name="chevron" size={15} /></label>
