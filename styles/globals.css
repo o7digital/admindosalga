@@ -86,6 +86,19 @@ h1 { font-size: clamp(27px, 2.2vw, 38px); margin: 9px 0 4px; letter-spacing: 0; 
 .attention-card { background: #17181b !important; color: white; border-color: #17181b !important; }
 .attention-card > span, .attention-card small { color: #8f9298; }
 .attention-card .metric-line em { background: #372124; color: #ff7a82; }
+.attention-card { cursor: pointer; }
+.attention-card.has-alerts { border: 2px solid #ff3341 !important; box-shadow: 0 0 0 3px rgba(239,0,16,.12), 0 10px 30px rgba(200,35,51,.2); animation: alertPulse 1.5s ease-in-out infinite; }
+.attention-card.has-alerts .metric-line strong { color: #ff4c58; }
+@keyframes alertPulse { 0%,100% { box-shadow: 0 0 0 3px rgba(239,0,16,.10), 0 10px 30px rgba(200,35,51,.15); } 50% { box-shadow: 0 0 0 8px rgba(239,0,16,.22), 0 12px 36px rgba(200,35,51,.32); } }
+
+.wp-sync-banner { margin-top: 16px; padding: 11px 14px; border: 1px solid #cfe5da; background: #f1faf6; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.wp-sync-banner > div { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.wp-sync-banner strong { color: #176b45; font-size: 10px; }
+.wp-sync-banner span, .wp-sync-banner small { color: #66706b; font-size: 9px; }
+.wp-sync-banner.failed { border: 2px solid #d52b38; background: #fff0f0; animation: alertPulse 1.5s ease-in-out infinite; }
+.wp-sync-banner.failed strong, .wp-sync-banner.failed span { color: #a51927; }
+.wp-sync-banner.running { border-color: #d9974a; background: #fff8eb; }
+.wp-sync-banner button { border: 1px solid #b01828; background: #b01828; color: white; padding: 7px 10px; font-size: 9px; font-weight: 800; display: inline-flex; align-items: center; gap: 6px; }
 
 .catalog-card { margin-top: 14px; background: white; border: 1px solid var(--line); box-shadow: 0 12px 40px rgba(24,24,24,.025); }
 .compact-card table { min-width: 760px; }
@@ -96,10 +109,13 @@ h1 { font-size: clamp(27px, 2.2vw, 38px); margin: 9px 0 4px; letter-spacing: 0; 
 .tab span { margin-left: 5px; color: #b0b2b6; }
 .tab.active { color: var(--ink); }
 .tab.active::after { content: ""; position: absolute; left: 10px; right: 10px; bottom: -1px; height: 2px; background: var(--red); }
-.tab.alert-tab { color: #a51927; }
+.tab.alert-tab { color: #8f1723; background: #fff5f4; border-left: 1px solid #f0b6b2; border-right: 1px solid #f0b6b2; }
 .tab.alert-tab span { color: #b01828; background: #fff0f0; border: 1px solid #f0b6b2; border-radius: 999px; padding: 3px 6px; }
 .tab.alert-tab.active { background: #fff0f0; color: #8f1723; }
 .tab.alert-tab.active::after { height: 4px; background: #c82333; }
+.tab.alert-tab:not(.active) span { animation: tabFlash 1.35s ease-in-out infinite; }
+@keyframes tabFlash { 0%,100% { background: #fff0f0; box-shadow: 0 0 0 0 rgba(200,35,51,0); } 50% { background: #ffccd0; box-shadow: 0 0 0 5px rgba(200,35,51,.18); } }
+.tab.draft-tab { color: #7f541f; background: #fffbf2; }
 .tab.draft-tab.active { background: #fff8eb; color: #8d5a1f; }
 .tab.draft-tab.active::after { background: #d9974a; }
 .export { border: 1px solid #e4e1dd; background: white; border-radius: 7px; padding: 7px 10px; display: flex; gap: 7px; align-items: center; color: #606268; font-size: 10px; font-weight: 700; white-space: nowrap; }

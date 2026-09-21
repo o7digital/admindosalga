@@ -279,6 +279,7 @@ export default function ProductControl() {
   const [syncProgress, setSyncProgress] = useState({ done: 0, total: 0 });
   const [cjConnection, setCjConnection] = useState({ configured: false, connected: false, mode: 'checking' });
   const [importingWp, setImportingWp] = useState(false);
+  const [wpSyncStatus, setWpSyncStatus] = useState(null);
   const [oliviaLoading, setOliviaLoading] = useState(false);
   const [oliviaReport, setOliviaReport] = useState(null);
   const [toast, setToast] = useState('');
@@ -337,12 +338,20 @@ export default function ProductControl() {
     return result;
   };
 
+  const loadWpSyncStatus = async () => {
+    const response = await fetch('/api/wp/status', { cache: 'no-store' });
+    const result = await response.json();
+    if (response.ok) setWpSyncStatus(result.sync);
+    return result;
+  };
+
   useEffect(() => {
     loadProducts().catch((loadError) => setError(loadError.message || 'Products could not be loaded.'));
     fetch('/api/exchange-rate', { cache: 'no-store' }).then((response) => response.json()).then(setFx).catch(() => {});
     loadCjConnection().catch((loadError) => {
       setCjConnection({ configured: true, connected: false, mode: 'error', message: loadError.message });
     });
+    loadWpSyncStatus().catch(() => {});
   }, []);
 
   const loadOrders = async () => {
@@ -394,6 +403,15 @@ export default function ProductControl() {
     if (productTab === 'drafts') return product.status === 'review';
     return true;
   }), [catalogFiltered, productTab]);
+
+  const selectProductTab = (tab) => {
+    setProductTab(tab);
+    setQuery('');
+    setCategory('All categories');
+    setShippingFilter('All shipping');
+    setMarginFilter('All margins');
+    setPage(1);
+  };
 
   useEffect(() => setPage(1), [category, marginFilter, market, productTab, query, shippingFilter]);
 
@@ -762,10 +780,12 @@ export default function ProductControl() {
       setProducts(importedProducts);
       persistProducts(importedProducts);
       if (result.persisted) await loadProducts();
+      await loadWpSyncStatus();
       const summary = (result.reports || []).map((report) => `${report.name}: ${report.count}`).join(' · ');
       notify(`WordPress import completed · ${summary}`);
     } catch (importError) {
       setError(importError.message || 'WordPress import failed.');
+      await loadWpSyncStatus().catch(() => {});
     } finally {
       setImportingWp(false);
     }
@@ -874,11 +894,13 @@ export default function ProductControl() {
                     : <div className="title-actions"><button className="btn secondary" onClick={importWordPress} disabled={importingWp}><Icon name="upload" />{importingWp ? 'Importing...' : 'Import WP'}</button><button className="btn secondary" onClick={openPricingRules}><Icon name="chart" /> Price rules</button><button className="btn secondary" onClick={syncCj} disabled={syncing}><span className={syncing ? 'spin' : ''}><Icon name="refresh" /></span>{syncButtonLabel}</button><button className="btn primary" onClick={openNewProduct}><Icon name="plus" /> Add product</button></div>}
             </div>
 
+            {!isGrowthWorkspace && activeView !== 'Orders' && wpSyncStatus && <div className={`wp-sync-banner ${wpSyncStatus.status}`} role="status"><div><strong>WordPress → Railway</strong><span>{wpSyncStatus.status === 'complete' ? `${wpSyncStatus.importedCount} produits synchronisés` : wpSyncStatus.status === 'running' ? 'Synchronisation en cours…' : `Échec : ${wpSyncStatus.errorMessage || 'erreur inconnue'}`}</span><small>{new Date(wpSyncStatus.completedAt || wpSyncStatus.startedAt).toLocaleString()}</small></div>{wpSyncStatus.status === 'failed' && <button type="button" onClick={importWordPress} disabled={importingWp}><Icon name="refresh" /> Relancer</button>}</div>}
+
             {!isGrowthWorkspace && activeView !== 'Orders' && <div className="metrics">
               <article><span>Active products</span><div className="metric-line"><strong>{metrics.active}</strong></div><small>Across both stores</small></article>
               <article><span>Average margin</span><div className="metric-line"><strong>{formatPercent(metrics.averageMargin)}</strong></div><small>After included shipping</small></article>
               <article><span>Shipping included</span><div className="metric-line"><strong>{metrics.active ? Math.round((metrics.included / metrics.active) * 100) : 0}%</strong></div><small>{metrics.included} of {metrics.active} products</small><div className="progress"><i style={{ width: `${metrics.active ? (metrics.included / metrics.active) * 100 : 0}%` }} /></div></article>
-              <article className="attention-card"><span>Needs attention</span><div className="metric-line"><strong>{metrics.attention}</strong><em>Review</em></div><small>Low stock, margin or CJ changes</small></article>
+              <article className={`attention-card ${metrics.attention ? 'has-alerts' : ''}`} onClick={() => { setActiveView('Products'); selectProductTab('review'); }}><span>Needs attention</span><div className="metric-line"><strong>{metrics.attention}</strong><em>Review</em></div><small>Low stock, margin or CJ changes</small></article>
             </div>}
 
             {activeView === 'Overview' && (
@@ -952,10 +974,10 @@ export default function ProductControl() {
 
             {activeView === 'Products' && <section className="catalog-card">
               <div className="catalog-head"><div className="tabs" role="tablist" aria-label="Product status filters">
-                <button type="button" role="tab" aria-selected={productTab === 'all'} className={`tab ${productTab === 'all' ? 'active' : ''}`} onClick={() => setProductTab('all')}>All products <span>{catalogFiltered.length}</span></button>
-                <button type="button" role="tab" aria-selected={productTab === 'active'} className={`tab ${productTab === 'active' ? 'active' : ''}`} onClick={() => setProductTab('active')}>Active <span>{catalogFiltered.filter((p) => p.status === 'approved' || p.status === 'ordered').length}</span></button>
-                <button type="button" role="tab" aria-selected={productTab === 'review'} className={`tab alert-tab ${productTab === 'review' ? 'active' : ''}`} onClick={() => setProductTab('review')}>Needs review <span>{catalogFiltered.filter(needsProductReview).length}</span></button>
-                <button type="button" role="tab" aria-selected={productTab === 'drafts'} className={`tab draft-tab ${productTab === 'drafts' ? 'active' : ''}`} onClick={() => setProductTab('drafts')}>Drafts <span>{catalogFiltered.filter((p) => p.status === 'review').length}</span></button>
+                <button type="button" role="tab" aria-selected={productTab === 'all'} className={`tab ${productTab === 'all' ? 'active' : ''}`} onClick={() => selectProductTab('all')}>All products <span>{catalogFiltered.length}</span></button>
+                <button type="button" role="tab" aria-selected={productTab === 'active'} className={`tab ${productTab === 'active' ? 'active' : ''}`} onClick={() => selectProductTab('active')}>Active <span>{catalogFiltered.filter((p) => p.status === 'approved' || p.status === 'ordered').length}</span></button>
+                <button type="button" role="tab" aria-selected={productTab === 'review'} className={`tab alert-tab ${productTab === 'review' ? 'active' : ''}`} onClick={() => selectProductTab('review')}>⚠ Needs review <span>{catalogFiltered.filter(needsProductReview).length}</span></button>
+                <button type="button" role="tab" aria-selected={productTab === 'drafts'} className={`tab draft-tab ${productTab === 'drafts' ? 'active' : ''}`} onClick={() => selectProductTab('drafts')}>Drafts <span>{catalogFiltered.filter((p) => p.status === 'review').length}</span></button>
               </div><button className="export" onClick={exportCsv}><Icon name="upload" /> Export CSV</button></div>
               <div className="filters">
                 <label className="search-box"><Icon name="search" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search product, SKU or brand" /></label>

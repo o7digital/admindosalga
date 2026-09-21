@@ -7,8 +7,6 @@ const storeSources = [
     name: 'Dosalga México',
     url: process.env.DOSALGA_MEXICO_WP_URL || 'https://wp-dosalga-mx.o7digitalgroup.com',
     storefrontUrl: process.env.DOSALGA_MEXICO_STOREFRONT_URL || 'https://www.dosalga.online',
-    catalogPath: '/api/products',
-    catalogQuery: { lang: 'es', per_page: '24', orderby: 'date', order: 'desc' },
     currency: 'MXN',
     destination: 'México',
   },

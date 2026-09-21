@@ -9,7 +9,7 @@ if (!connectionString) {
   process.exit(1);
 }
 
-const ssl = connectionString.includes('localhost')
+const ssl = connectionString.includes('localhost') || process.env.DATABASE_SSL === 'false'
   ? undefined
   : { rejectUnauthorized: false };
 
@@ -60,4 +60,3 @@ main().catch((error) => {
   console.error(`Migration failed: ${error.message}`);
   process.exit(1);
 });
-
