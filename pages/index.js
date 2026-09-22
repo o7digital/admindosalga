@@ -38,6 +38,8 @@ const blankProduct = {
   shippingCost: 0,
   shippingUsd: 0,
   shippingCurrency: 'USD',
+  shippingConfirmed: false,
+  shippingConfirmedAt: null,
   shippingOrigin: 'CJ · China',
   shippingDestination: 'USA',
   transportMethod: 'CJPacket',
@@ -276,7 +278,6 @@ export default function ProductControl() {
   const [page, setPage] = useState(1);
   const [showAllProducts, setShowAllProducts] = useState(false);
   const [fx, setFx] = useState(null);
-  const [fxApplying, setFxApplying] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(blankProduct);
   const [syncing, setSyncing] = useState(false);
@@ -648,19 +649,6 @@ export default function ProductControl() {
     notify(editingProduct.id ? 'Product updated' : 'Product created');
   };
 
-  const applyExchangeRate = async () => {
-    if (!fx?.rate || !window.confirm(`Valider le taux ${fx.rate} USD/MXN pour tout le catalogue ? Les prix calculés seront mis à jour dans le dashboard, sans publication automatique vers WooCommerce.`)) return;
-    setFxApplying(true);
-    setError('');
-    try {
-      const response = await fetch('/api/exchange-rate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rate: fx.rate, editor: editorName() }) });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.message || 'FX update failed.');
-      await loadProducts();
-      notify(`FX ${result.rate} validé · ${result.updated} produits actualisés`);
-    } catch (applyError) { setError(applyError.message); } finally { setFxApplying(false); }
-  };
-
   const archiveProduct = async (product) => {
     await fetch(`/api/products?id=${encodeURIComponent(product.id)}`, { method: 'DELETE' });
     await loadProducts();
@@ -714,6 +702,8 @@ export default function ProductControl() {
       shippingCost: route.shippingCost || 0,
       shippingUsd: route.shippingCost || 0,
       shippingCurrency: result.product.currency,
+      shippingConfirmed: route.shippingCost !== undefined,
+      shippingConfirmedAt: route.shippingCost !== undefined ? new Date().toISOString() : current.shippingConfirmedAt,
       shippingOrigin: route.origin || current.shippingOrigin,
       shippingDestination: route.destination || current.shippingDestination,
       transportMethod: route.method || current.transportMethod,
@@ -748,7 +738,10 @@ export default function ProductControl() {
         const response = await fetch('/api/cj/sync', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ products: batch, includeFreight: false }),
+          body: JSON.stringify({
+            products: batch,
+            includeFreight: batch.some((product) => !product.shippingConfirmed && !(Number(product.shippingUsd) > 0)),
+          }),
         });
         const result = await response.json();
 
@@ -989,12 +982,12 @@ export default function ProductControl() {
                 <label className="select-wrap"><select value={shippingFilter} onChange={(event) => setShippingFilter(event.target.value)}><option>All shipping</option><option>Included</option><option>Separate</option></select><Icon name="chevron" size={15} /></label>
                 <label className="select-wrap"><select value={marginFilter} onChange={(event) => setMarginFilter(event.target.value)}><option>All margins</option><option>Under 35%</option><option>35% and up</option></select><Icon name="chevron" size={15} /></label>
                 <button className="export" type="button" onClick={() => { setShowAllProducts((value) => !value); setPage(1); }}>{showAllProducts ? 'Paginer' : 'Voir toute la liste'}</button>
-                {fx?.rate && <button className="export" type="button" onClick={applyExchangeRate} disabled={fxApplying}>{fxApplying ? 'Actualisation…' : `Valider FX ${fx.rate} · ${fx.date}`}</button>}
+                {fx?.rate && <span className="daily-fx-badge">Tipo de cambio du jour · {fx.rate} MXN/USD · {fx.date}</span>}
                 <span className="result-count">{filtered.length} shown · Priority first</span>
               </div>
               <div className="table-wrap">
                 <table>
-                  <thead><tr><th className="product-col">Product / brand</th><th>Store</th><th>Currency</th><th>CJ cost USD</th><th>Shipping USD</th><th>Sale price</th><th>Variation FX</th><th>Update WooCommerce price</th><th>Temu</th><th>Amazon</th><th>Route & ETA</th><th>Stock</th><th>Margin</th><th>Editor (Clerk)</th><th>Sync</th><th /></tr></thead>
+                  <thead><tr><th className="product-col">Product / brand</th><th>Store</th><th>Railway price</th><th>CJ cost USD</th><th>Shipping produit</th><th>Sale price</th><th>FX produit / jour</th><th>Update WooCommerce price</th><th>Temu</th><th>Amazon</th><th>Route & ETA</th><th>Stock</th><th>Margin</th><th>Editor (Clerk)</th><th>Sync</th><th /></tr></thead>
                   <tbody>{pageProducts.map((product) => {
                     const margin = calculateProductMargin(product);
                     const percent = Math.round(margin.marginRate * 100);
@@ -1005,11 +998,11 @@ export default function ProductControl() {
                       <tr key={product.id} className={publishedCurrent ? 'price-success-row' : audit.critical ? 'price-alert-row' : ''}>
                         <td><div className="product-cell"><ProductVisual product={product} /><div><strong>{product.productUrl ? <a href={product.productUrl} target="_blank" rel="noreferrer">{product.name}</a> : product.name}</strong><span>{product.brand} · {product.sku}</span><small className={`status ${product.wooFrozen ? 'blocked' : product.status === 'paused' || product.status === 'review' ? 'review' : product.stock <= 10 ? 'low-stock' : ''}`}>{product.wooFrozen ? 'Bloqué dans WooCommerce' : product.status}</small>{audit.issues.length > 0 && <small className="product-alert-reason">⚠ {audit.issues[0].message}</small>}{product.wooFrozen ? <span className="sale-blocked-badge">⛔ Vente bloquée</span> : <button type="button" className="block-sale-button" disabled={blockingProductId === product.id} onClick={() => blockProductSale(product)}>{blockingProductId === product.id ? 'Blocage…' : 'Bloquer la vente'}</button>}</div></div></td>
                         <td><span className={`market-badge ${marketFor(product) === 'USA' ? 'usa' : 'mexico'}`}>{marketFor(product) !== 'Both' && <span className={`flag ${marketFor(product) === 'USA' ? 'us' : 'mx'}`} />}{marketFor(product)}</span></td>
-                        <td><span className={`currency-pill ${product.currencyMismatch ? 'currency-mismatch' : ''}`}>{product.saleCurrency}</span><small className="currency-source">Railway · {product.sourceCurrency} → {product.saleCurrency}</small><small className={product.priceRegistry?.verified ? 'included' : 'danger-text'}>{product.priceRegistry?.verified ? '● Devise vérifiée par produit' : '⚠ Devise à vérifier'}</small>{product.priceImportRule === 'caps-native-mxn-v1' && <small className="currency-source native-price-rule">CAPS · prix natif MXN</small>}{product.currencyMismatch && <small className="danger-text">Expected {product.expectedStoreCurrency}</small>}</td>
+                        <td><span className={`currency-pill ${product.currencyMismatch ? 'currency-mismatch' : ''}`}>{product.saleCurrency}</span><strong className="railway-price-value">{formatCurrency(product.salePrice, product.saleCurrency)}</strong><small className="currency-source">Origine Railway : {formatCurrency(product.sourcePrice, product.sourceCurrency)}</small><small className="currency-source">Final Railway : {formatCurrency(product.salePrice, product.saleCurrency)}</small><small className={product.priceRegistry?.verified ? 'included' : 'danger-text'}>{product.priceRegistry?.verified ? '● Devise vérifiée par produit' : '⚠ Devise à vérifier'}</small>{product.priceImportRule === 'caps-native-mxn-v1' && <small className="currency-source native-price-rule">CAPS · prix natif MXN</small>}{product.currencyMismatch && <small className="danger-text">Expected {product.expectedStoreCurrency}</small>}</td>
                         <td className="number"><strong>{formatCurrency(product.cjCostUsd, 'USD')}</strong><small>Prix CJ d’origine : {product.cjOriginalCostUsd > 0 ? formatCurrency(product.cjOriginalCostUsd, product.cjOriginalCostCurrency || 'USD') : 'à importer'}</small><small>{product.cjOriginalCostAt ? `Première capture : ${new Date(product.cjOriginalCostAt).toLocaleDateString()}` : product.cjSku || product.pid}</small></td>
-                        <td><strong>{Number(product.shippingUsd) > 0 ? formatCurrency(product.shippingUsd, 'USD') : 'Not confirmed'}</strong><small>{product.shippingDestination} · {product.minDeliveryDays}-{product.maxDeliveryDays} days</small></td>
+                        <td><strong>{product.shippingConfirmed || Number(product.shippingUsd) > 0 ? formatCurrency(product.shippingUsd, 'USD') : 'À synchroniser depuis CJ'}</strong>{(product.shippingConfirmed || Number(product.shippingUsd) > 0) && <small>{formatCurrency(product.shippingUsd, 'USD')} × FX produit {product.exchangeRate} = {formatCurrency(Number(product.shippingUsd) * Number(product.exchangeRate), 'MXN')}</small>}<small>{product.shippingDestination} · {product.minDeliveryDays}-{product.maxDeliveryDays} days</small>{product.shippingConfirmedAt && <small>Confirmé CJ : {new Date(product.shippingConfirmedAt).toLocaleDateString()}</small>}</td>
                         <td className="number">{publishedCurrent ? <><small className="new-sale-label">Prix final</small><strong className="new-sale-price">{formatCurrency(product.salePrice, product.saleCurrency)}</strong><small className="old-sale-price">Old: {formatCurrency(product.wooPricePublication.previousPrice ?? product.previousSalePrice ?? product.sourcePrice, product.saleCurrency)}</small></> : <><small className="new-sale-label">Prix final</small><strong className="new-sale-price">{formatCurrency(product.salePrice, product.saleCurrency)}</strong></>}{product.saleCurrency === 'MXN' && <small className="usd-equivalent">≈ {formatCurrency(audit.saleUsd, 'USD')} · FX {product.exchangeRate}</small>}<small className="price-origin-railway">Prix d’origine Railway : {formatCurrency(product.sourcePrice, product.sourceCurrency)}</small><small className={product.shippingIncluded ? 'included' : 'separate'}>{product.shippingIncluded === true ? '● Shipping included in sale price' : product.shippingIncluded === false ? '○ Shipping charged separately' : 'Shipping inclusion unconfirmed'}</small></td>
-                        <td className="number"><strong className="new-sale-price">{product.sourceCurrency === 'USD' && product.saleCurrency === 'MXN' ? `${formatCurrency(product.sourcePrice, 'USD')} × ${product.exchangeRate} = ${formatCurrency(product.salePrice, 'MXN')}` : `${formatCurrency(product.sourcePrice, product.sourceCurrency)} → ${formatCurrency(product.salePrice, product.saleCurrency)}`}</strong><small>{product.priceRegistry?.decisionSource || (product.fxRateDate ? `Taux du ${product.fxRateDate}` : 'Railway')}</small></td>
+                        <td className="number"><strong className="new-sale-price">FX produit : {Number(product.exchangeRate).toFixed(4)}</strong><small>{product.sourceCurrency === 'USD' && product.saleCurrency === 'MXN' ? `${formatCurrency(product.sourcePrice, 'USD')} × ${product.exchangeRate} = ${formatCurrency(product.salePrice, 'MXN')}` : 'Prix natif : aucune conversion du prix'}</small><strong className="daily-fx-value">FX du jour : {fx?.rate ? Number(fx.rate).toFixed(4) : '—'}</strong><small>{fx?.date ? `${fx.date} · ${fx.source}` : 'Taux du jour indisponible'}</small>{fx?.rate && <small className={Math.abs(Number(product.exchangeRate) - Number(fx.rate)) > 0.01 ? 'danger-text' : 'included'}>Écart : {(Number(product.exchangeRate) - Number(fx.rate)).toFixed(4)}</small>}<small>{product.priceRegistry?.decisionSource || 'Railway'}</small></td>
                         <CjPriceCell key={`${product.id}-${product.saleCurrency}-${product.cjPriceProposal?.savedAt || 'new'}`} product={product} onSaved={savePriceProposal} onPublished={confirmWooPricePublication} disabled={syncing || importingWp} />
                         {['Temu', 'Amazon'].map((competitorName) => {
                           const offer = product.competitors?.[competitorName.toLowerCase()];

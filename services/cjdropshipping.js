@@ -294,6 +294,8 @@ export const syncCjProduct = async (product, { includeFreight = false } = {}) =>
         shippingCost: route.shippingCost,
         shippingUsd: route.shippingCost,
         shippingCurrency: 'USD',
+        shippingConfirmed: true,
+        shippingConfirmedAt: new Date().toISOString(),
         shippingOrigin: route.origin || product.shippingOrigin,
         shippingDestination: route.destination || product.shippingDestination,
         transportMethod: route.method || product.transportMethod,

@@ -205,6 +205,8 @@ td small { margin-top: 5px; color: #96989d; font-size: 8px; white-space: nowrap;
 .currency-source { color: #686b72 !important; font-size: 8px !important; font-weight: 700; }
 .native-price-rule { color: #176b45 !important; font-weight: 800; }
 .price-origin-railway { color: #202329 !important; font-weight: 800; }
+.railway-price-value, .daily-fx-value { display: block; margin-top: 5px; color: #087f5b; font-weight: 800; }
+.daily-fx-badge { border: 1px solid #b9d8ca; border-radius: 10px; padding: 10px 13px; background: #effaf5; color: #176b50; font-size: 12px; font-weight: 800; white-space: nowrap; }
 .included { color: var(--green); }
 .separate { color: #9b6b3c; }
 .danger-text { color: #bb3a43 !important; }
