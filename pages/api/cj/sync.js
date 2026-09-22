@@ -2,6 +2,9 @@ import { syncCjProduct } from '@/services/cjdropshipping';
 import { databaseIsAvailable, upsertProducts } from '@/lib/productRepository';
 
 const MAX_BATCH_SIZE = 4;
+const CJ_REQUEST_INTERVAL_MS = 1100;
+
+const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -18,9 +21,17 @@ export default async function handler(req, res) {
   }
 
   const includeFreight = Boolean(req.body?.includeFreight);
-  const results = await Promise.allSettled(
-    requestedProducts.map((product) => syncCjProduct(product, { includeFreight }))
-  );
+  // CJ API v2 accepts one request per second. Sequential processing prevents
+  // a full-catalog sync from turning valid product codes into rate-limit errors.
+  const results = [];
+  for (const [index, product] of requestedProducts.entries()) {
+    if (index > 0) await wait(CJ_REQUEST_INTERVAL_MS);
+    try {
+      results.push({ status: 'fulfilled', value: await syncCjProduct(product, { includeFreight }) });
+    } catch (reason) {
+      results.push({ status: 'rejected', reason });
+    }
+  }
   const products = [];
   const reports = results.map((result, index) => {
     const sourceProduct = requestedProducts[index];

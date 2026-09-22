@@ -2,6 +2,9 @@ import { syncCjProductCost } from '@/services/cjdropshipping';
 import { databaseIsAvailable, listProducts, upsertProducts } from '@/lib/productRepository';
 
 const MAX_BATCH_SIZE = 4;
+const CJ_REQUEST_INTERVAL_MS = 1100;
+
+const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
 const requestId = (product) => String(
   typeof product === 'string' ? product : product?.id || '',
@@ -29,14 +32,22 @@ export default async function handler(req, res) {
     authoritativeById = new Map((await listProducts()).map((product) => [product.id, product]));
   }
 
-  const results = await Promise.allSettled(requestedProducts.map(async (requested) => {
-    const id = requestId(requested);
-    const product = authoritativeById ? authoritativeById.get(id) : requested;
-    if (!product || typeof product !== 'object') {
-      throw new Error(`Product ${id || '(missing id)'} was not found.`);
+  // CJ API v2 enforces a one-request-per-second QPS limit. Keep every lookup
+  // sequential, including products submitted together in the same batch.
+  const results = [];
+  for (const [index, requested] of requestedProducts.entries()) {
+    if (index > 0) await wait(CJ_REQUEST_INTERVAL_MS);
+    try {
+      const id = requestId(requested);
+      const product = authoritativeById ? authoritativeById.get(id) : requested;
+      if (!product || typeof product !== 'object') {
+        throw new Error(`Product ${id || '(missing id)'} was not found.`);
+      }
+      results.push({ status: 'fulfilled', value: await syncCjProductCost(product) });
+    } catch (reason) {
+      results.push({ status: 'rejected', reason });
     }
-    return syncCjProductCost(product);
-  }));
+  }
 
   const products = [];
   const reports = results.map((result, index) => {
