@@ -204,6 +204,7 @@ td small { margin-top: 5px; color: #96989d; font-size: 8px; white-space: nowrap;
 .currency-pill.currency-mismatch { color: #fff; background: #b01828; }
 .currency-source { color: #686b72 !important; font-size: 8px !important; font-weight: 700; }
 .native-price-rule { color: #176b45 !important; font-weight: 800; }
+.price-origin-railway { color: #202329 !important; font-weight: 800; }
 .included { color: var(--green); }
 .separate { color: #9b6b3c; }
 .danger-text { color: #bb3a43 !important; }

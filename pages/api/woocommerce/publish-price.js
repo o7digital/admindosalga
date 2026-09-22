@@ -1,4 +1,4 @@
-import { databaseIsAvailable, listProducts, beginWooPricePublication, finishWooPricePublication } from '@/lib/productRepository';
+import { databaseIsAvailable, listProducts, beginWooPricePublication, finishWooPricePublication, stageRailwayPricePublication } from '@/lib/productRepository';
 import { listingIdentity } from '@/lib/cjPublication.mjs';
 import { hasWooWriteCredentials, publishWooPrice, reviewWooPrice } from '@/services/woocommerce';
 
@@ -18,6 +18,7 @@ export default async function handler(req, res) {
     const identity = listingIdentity(product);
     const proposal = product.cjPriceProposal;
     if (!proposal) throw new Error('Save a price proposal first.');
+    if (product.saleCurrency !== proposal.currency) throw new Error('The saved Railway listing currency no longer matches this price proposal. Reload the catalogue.');
     if (proposal.currency !== identity.currency) throw new Error(`Price currency must be ${identity.currency} for this WooCommerce store.`);
     if (!hasWooWriteCredentials(identity.market)) throw new Error(`WooCommerce ${identity.market} write credentials are missing.`);
 
@@ -38,9 +39,14 @@ export default async function handler(req, res) {
     }
     operation = await beginWooPricePublication(productId, proposal.savedAt);
     if (!operation) return res.status(409).json({ message: 'Another publication is running or this proposal was already published. Reload before retrying.' });
+    await stageRailwayPricePublication(productId, proposal, 'woocommerce');
 
-    const woo = await publishWooPrice(identity, proposal.price, product.sku);
-    const verified = woo.updated.length > 0 && woo.updated.every(item => Number(item.price) === Number(proposal.price));
+    const woo = await publishWooPrice(identity, proposal.price, product.sku, {
+      currency: product.saleCurrency,
+      sourceCurrency: product.sourceCurrency,
+      exchangeRate: product.exchangeRate,
+    });
+    const verified = woo.currencyVerified && woo.updated.length > 0 && woo.updated.every(item => Number(item.price) === Number(proposal.price));
     if (!verified) throw new Error('WooCommerce did not confirm the new price on every product or variation.');
 
     const publication = {
@@ -51,6 +57,7 @@ export default async function handler(req, res) {
       previousPrice: Number(product.salePrice),
       price: proposal.price,
       currency: proposal.currency,
+      exchangeRate: product.exchangeRate,
       wooVerified: true,
       wooUpdated: woo.updated.length,
     };

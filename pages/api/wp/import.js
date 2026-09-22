@@ -1,6 +1,10 @@
 import { importWordPressStores } from '@/services/wordpressStores';
-import { databaseIsAvailable, upsertProducts } from '@/lib/productRepository';
+import { databaseIsAvailable, listProducts, upsertProducts } from '@/lib/productRepository';
+import { mergeCjDataIntoWordPressProduct } from '@/lib/cjData.mjs';
+import { mergeRegisteredPriceIntoImport } from '@/lib/priceRegistry.mjs';
 import { failWordPressSync, finishWordPressSync, startWordPressSync } from '@/lib/wordpressSyncRepository';
+
+const listingKey = (product) => `${product.siteId || ''}:${String(product.sku || '').trim().toLowerCase()}`;
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -11,16 +15,27 @@ export default async function handler(req, res) {
   try {
     if (databaseIsAvailable()) syncId = await startWordPressSync(req.headers['x-sync-trigger'] || 'manual');
     const result = await importWordPressStores();
+    let products = result.products;
     if (databaseIsAvailable()) {
-      await upsertProducts(result.products);
-      await finishWordPressSync(syncId, { importedCount: result.products.length, reports: result.reports });
+      const existingProducts = await listProducts();
+      const existingById = new Map(existingProducts.map((product) => [product.id, product]));
+      const existingByListing = new Map(existingProducts.map((product) => [listingKey(product), product]));
+      products = result.products.map((product) => {
+        const existing = existingById.get(product.id) || existingByListing.get(listingKey(product));
+        return mergeCjDataIntoWordPressProduct(
+          mergeRegisteredPriceIntoImport(product, existing),
+          existing,
+        );
+      });
+      await upsertProducts(products);
+      await finishWordPressSync(syncId, { importedCount: products.length, reports: result.reports });
     }
 
     return res.status(200).json({
       importedAt: result.importedAt,
       reports: result.reports,
-      importedCount: result.products.length,
-      products: result.products,
+      importedCount: products.length,
+      products,
       persisted: databaseIsAvailable(),
       syncId,
     });

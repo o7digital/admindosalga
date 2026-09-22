@@ -1,3 +1,5 @@
+import { applyCjCostUpdate, parseCjPrice } from '../lib/cjData.mjs';
+
 const CJ_API_BASE_URL = process.env.CJ_API_BASE_URL || 'https://developers.cjdropshipping.com/api2.0/v1';
 const CJ_REQUEST_TIMEOUT_MS = Number(process.env.CJ_REQUEST_TIMEOUT_MS) || 20000;
 
@@ -149,7 +151,7 @@ const queryProduct = async (input) => {
   throw lastError || new Error(`CJ product not found for ${identifier}`);
 };
 
-const variantPrice = (variant) => asNumber(variant?.variantSellPrice || variant?.sellPrice);
+const variantPrice = (variant) => parseCjPrice(variant?.variantSellPrice ?? variant?.sellPrice);
 
 const selectVariant = (product, identifier) => {
   const variants = Array.isArray(product?.variants) ? product.variants : [];
@@ -158,7 +160,8 @@ const selectVariant = (product, identifier) => {
   ));
 
   if (exact) return exact;
-  return [...variants].sort((left, right) => variantPrice(left) - variantPrice(right))[0] || null;
+  const pricedVariants = variants.filter((variant) => variantPrice(variant) > 0);
+  return pricedVariants.sort((left, right) => variantPrice(left) - variantPrice(right))[0] || variants[0] || null;
 };
 
 const inventoryForProduct = (product) => {
@@ -232,7 +235,7 @@ export const importCjProduct = async ({ query, destination = 'USA', includeFreig
     }
   }
 
-  const cjCost = variantPrice(variant) || asNumber(cjProduct.sellPrice);
+  const cjCost = variantPrice(variant) || parseCjPrice(cjProduct.sellPrice);
 
   return {
     mode: 'live',
@@ -269,7 +272,8 @@ export const syncCjProduct = async (product, { includeFreight = false } = {}) =>
   });
   const cjProduct = imported.product;
   const route = cjProduct.selectedRoute || {};
-  const changes = [];
+  const costUpdate = applyCjCostUpdate(product, cjProduct);
+  const changes = [...costUpdate.changes];
 
   const compare = (field, oldValue, newValue) => {
     if (newValue !== undefined && newValue !== null && String(oldValue ?? '') !== String(newValue)) {
@@ -277,23 +281,15 @@ export const syncCjProduct = async (product, { includeFreight = false } = {}) =>
     }
   };
 
-  compare('cjCostUsd', product.cjCostUsd ?? product.cjCost, cjProduct.cjCost);
   if (includeFreight && route.shippingCost !== undefined) {
     compare('shippingUsd', product.shippingUsd ?? product.shippingCost, route.shippingCost);
   }
-  compare('stock', product.stock, cjProduct.stock);
+  compare('cjStock', product.cjStock, cjProduct.stock);
 
   return {
     mode: imported.mode,
     product: {
-      ...product,
-      pid: cjProduct.pid || product.pid,
-      cjSku: cjProduct.cjSku || product.cjSku,
-      supplier: 'CJdropshipping',
-      cjCost: cjProduct.cjCost,
-      cjCostUsd: cjProduct.cjCost,
-      cjCostCurrency: 'USD',
-      imageUrl: cjProduct.imageUrl || product.imageUrl,
+      ...costUpdate.product,
       ...(includeFreight && route.shippingCost !== undefined ? {
         shippingCost: route.shippingCost,
         shippingUsd: route.shippingCost,
@@ -304,12 +300,24 @@ export const syncCjProduct = async (product, { includeFreight = false } = {}) =>
         minDeliveryDays: route.minDeliveryDays || product.minDeliveryDays,
         maxDeliveryDays: route.maxDeliveryDays || product.maxDeliveryDays,
       } : {}),
-      stock: cjProduct.stock,
-      lastCjSyncAt: new Date().toISOString(),
       cjChangeReport: changes,
-      updatedAt: new Date().toISOString(),
     },
     changes,
+  };
+};
+
+export const syncCjProductCost = async (product) => {
+  const imported = await importCjProduct({
+    query: product.pid || product.cjSku || product.sku || product.cjProductUrl,
+    destination: product.shippingDestination || (product.siteId === 'dosalga-usa' ? 'USA' : 'México'),
+    includeFreight: false,
+  });
+  const costUpdate = applyCjCostUpdate(product, imported.product);
+
+  return {
+    mode: imported.mode,
+    product: costUpdate.product,
+    changes: costUpdate.changes,
   };
 };
 

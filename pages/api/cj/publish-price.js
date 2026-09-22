@@ -1,4 +1,4 @@
-import { databaseIsAvailable, listProducts, beginCjPublication, finishCjPublication } from '@/lib/productRepository';
+import { databaseIsAvailable, listProducts, beginCjPublication, finishCjPublication, stageRailwayPricePublication } from '@/lib/productRepository';
 import { getCjShops, getCjShopProduct, saveCjShopProduct, saveCjShopVariants } from '@/services/cjdropshipping';
 import { hasWooWriteCredentials, publishWooPrice } from '@/services/woocommerce';
 import { listingIdentity, selectShop, publicationVariants, allVariantsAccepted } from '@/lib/cjPublication.mjs';
@@ -25,6 +25,7 @@ export default async function handler(req, res) {
     const identity = listingIdentity(product);
     const proposal = product.cjPriceProposal;
     if (!proposal) throw new Error('Save a price proposal first.');
+    if (product.saleCurrency !== proposal.currency) throw new Error('The saved Railway listing currency no longer matches this price proposal. Reload the catalogue.');
     if (req.method === 'POST' && !hasWooWriteCredentials(identity.market)) {
       throw new Error(`WooCommerce ${identity.market} write credentials are missing. Configure WOOCOMMERCE_${identity.market}_CONSUMER_KEY and WOOCOMMERCE_${identity.market}_CONSUMER_SECRET before publishing; no CJ write was attempted.`);
     }
@@ -45,6 +46,7 @@ export default async function handler(req, res) {
     if (req.body?.savedAt !== proposal.savedAt || req.body?.confirmAllVariants !== true) throw new Error('Review the current proposal and confirm all variants first.');
     operation = await beginCjPublication(productId, proposal.savedAt);
     if (!operation) return res.status(409).json({ message: 'Another publication is running or the proposal changed. Reload before retrying.' });
+    await stageRailwayPricePublication(productId, proposal, 'cj-and-woocommerce');
     const cjProduct = await saveCjShopProduct(shop.id, {
       id: identity.productId,
       title: detail.platformProductTitle || detail.title || product.name,
@@ -63,13 +65,17 @@ export default async function handler(req, res) {
     let wooVerified = false;
     let wooResult = null;
     if (accepted) {
-      wooResult = await publishWooPrice(identity, proposal.price);
-      wooVerified = wooResult.updated.length > 0 && wooResult.updated.every(item => Number(item.price) === Number(proposal.price));
+      wooResult = await publishWooPrice(identity, proposal.price, product.sku, {
+        currency: product.saleCurrency,
+        sourceCurrency: product.sourceCurrency,
+        exchangeRate: product.exchangeRate,
+      });
+      wooVerified = wooResult.currencyVerified && wooResult.updated.length > 0 && wooResult.updated.every(item => Number(item.price) === Number(proposal.price));
       if (!wooVerified) throw new Error('WooCommerce did not confirm the new price on every product/variation.');
       state = 'woo_verified';
-      message = `CJ and WooCommerce updated successfully (${woo.updated.length} price${woo.updated.length === 1 ? '' : 's'}).`;
+      message = `CJ and WooCommerce updated successfully (${wooResult.updated.length} price${wooResult.updated.length === 1 ? '' : 's'}).`;
     }
-    const publication = { state, message, at: new Date().toISOString(), proposalSavedAt: proposal.savedAt, price: proposal.price, currency: proposal.currency, shopId: shop.id, variantCount: variants.length, requestId: cj.requestId || cjProduct.requestId || null, wooVerified, wooUpdated: wooResult?.updated?.length || 0 };
+    const publication = { state, message, at: new Date().toISOString(), proposalSavedAt: proposal.savedAt, price: proposal.price, currency: proposal.currency, exchangeRate: product.exchangeRate, shopId: shop.id, variantCount: variants.length, requestId: cj.requestId || cjProduct.requestId || null, wooVerified, wooUpdated: wooResult?.updated?.length || 0 };
     await finishCjPublication(productId, operation, publication);
     return res.status(200).json({ publication });
   } catch (error) {

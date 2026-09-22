@@ -20,8 +20,9 @@ Pour activer la synchronisation CJdropshipping en direct, configurer la variable
 `CJ_API_KEY`. L'admin échange cette clé contre un jeton CJ côté serveur; aucun secret CJ
 n'est envoyé au navigateur. `CJ_ACCESS_TOKEN` peut aussi être utilisé temporairement.
 
-La synchronisation catalogue récupère les coûts et les stocks par lots de quatre produits.
-L'import d'un produit individuel récupère également les routes et coûts de livraison.
+La synchronisation de coût CJ fonctionne par lots de quatre produits. Elle met à jour le
+coût CJ et conserve séparément le stock CJ, sans écraser le stock de vente WooCommerce.
+L'import d'un produit individuel peut également récupérer les routes et coûts de livraison.
 
 ## Prix WooCommerce (US / MX)
 
@@ -53,15 +54,25 @@ devra être résolue avant toute écriture de prix. Aucun endpoint CJ non docume
 
 Vérification des calculs et validations : `node --test tests/cjPricing.test.mjs`.
 
-## Donnees
+## Registre de prix Railway
 
-La devise source est vérifiée par fiche : la montre `wp-dosalga-mexico-12711`
-a été confirmée en USD par le propriétaire (23,58 USD × 17,49 = 412,41 MXN).
-Les autres fiches MX conservent le montant et la devise de WooCommerce, sans conversion
-fondée sur la taille du prix. L'ancienne conversion globale est annulée à la lecture
-si elle a été persistée, en restaurant le montant source conservé. Un marqueur évite
-les doubles conversions. Les propositions saisies restent intactes.
-Vérification : `node --test tests/wooPricing.test.mjs`.
+La devise est décidée et conservée par produit, jamais par catalogue ou par taille de
+montant. `product_price_registry` contient le prix d'origine, sa devise (`USD` ou `MXN`),
+le taux, le prix final et sa devise. `product_price_history` conserve chaque changement.
+Une fiche USD est convertie une seule fois vers le MXN ; une fiche déjà importée en MXN
+reste inchangée. La montre `wp-dosalga-mexico-12711`, publiée à 700 MXN, reste donc à
+700 MXN.
+
+Railway est mis à jour avant tout appel distant vers CJ ou WooCommerce. Le storefront lit
+le prix final directement dans ce registre, ce qui évite d'attendre le cache WordPress.
+WooCommerce reçoit ensuite le prix final et des métadonnées distinctes :
+`dosalga_price_origin_currency` pour la devise importée et
+`dosalga_price_value_currency` pour la devise du montant réellement stocké dans WP.
+Le module MU prêt à installer
+`wordpress/mu-plugins/dosalga-price-currency-column.php` ajoute la colonne
+« Currency importée » à la liste des produits WooCommerce.
+
+Vérification : `node --test tests/wooPricing.test.mjs tests/priceRegistry.test.mjs`.
 
 Railway PostgreSQL est la source centrale lorsque `DATABASE_URL` est configurée. La connexion
 Vercel doit obligatoirement accepter TLS. Le PgBouncer du template ne doit être utilisé sur
