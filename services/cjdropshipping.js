@@ -2,8 +2,12 @@ import { applyCjCostUpdate, parseCjPrice } from '../lib/cjData.mjs';
 
 const CJ_API_BASE_URL = process.env.CJ_API_BASE_URL || 'https://developers.cjdropshipping.com/api2.0/v1';
 const CJ_REQUEST_TIMEOUT_MS = Number(process.env.CJ_REQUEST_TIMEOUT_MS) || 20000;
+const CJ_REQUEST_INTERVAL_MS = 1100;
 
 let cachedToken = null;
+let nextCjRequestAt = 0;
+
+const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
 const getApiKey = () => String(process.env.CJ_API_KEY || process.env.CJDROPSHIPPING_API_KEY || '').trim();
 const getStaticAccessToken = () => String(process.env.CJ_ACCESS_TOKEN || '').trim();
@@ -84,6 +88,9 @@ const getAccessToken = async () => {
 
 const cjRequest = async (path, { method = 'GET', query, body } = {}) => {
   const accessToken = await getAccessToken();
+  const delay = Math.max(0, nextCjRequestAt - Date.now());
+  if (delay > 0) await wait(delay);
+  nextCjRequestAt = Date.now() + CJ_REQUEST_INTERVAL_MS;
   const url = new URL(`${CJ_API_BASE_URL}${path}`);
 
   Object.entries(query || {}).forEach(([key, value]) => {
