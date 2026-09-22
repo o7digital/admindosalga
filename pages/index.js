@@ -316,7 +316,7 @@ export default function ProductControl() {
   };
 
   const loadProducts = async () => {
-    const response = await fetch('/api/products');
+    const response = await fetch(`/api/products?fresh=${Date.now()}`, { cache: 'no-store' });
     const result = await response.json();
     if (!response.ok) throw new Error(result.message || 'Products could not be loaded.');
     let cachedProducts = null;
@@ -357,6 +357,22 @@ export default function ProductControl() {
       setCjConnection({ configured: true, connected: false, mode: 'error', message: loadError.message });
     });
     loadWpSyncStatus().catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const refreshFromRailway = () => {
+      if (document.visibilityState === 'visible') {
+        loadProducts().catch((loadError) => setError(loadError.message || 'Products could not be refreshed.'));
+      }
+    };
+    const interval = window.setInterval(refreshFromRailway, 30000);
+    window.addEventListener('focus', refreshFromRailway);
+    document.addEventListener('visibilitychange', refreshFromRailway);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('focus', refreshFromRailway);
+      document.removeEventListener('visibilitychange', refreshFromRailway);
+    };
   }, []);
 
   const loadOrders = async () => {

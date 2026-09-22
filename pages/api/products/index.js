@@ -74,6 +74,7 @@ const buildProduct = (payload) => {
 export default async function handler(req, res) {
   try {
     if (req.method === 'GET') {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
       const products = databaseIsAvailable() ? await listDatabaseProducts() : await readProducts();
       return res.status(200).json({ products: products.map(normalizeWooPrice), source: databaseIsAvailable() ? 'postgresql' : 'json' });
     }
