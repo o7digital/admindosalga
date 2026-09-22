@@ -36,6 +36,9 @@ test('cost-only CJ update preserves every WooCommerce sale field and stock', () 
 
   assert.equal(update.product.cjCostUsd, 6.62);
   assert.equal(update.product.cjCostCurrency, 'USD');
+  assert.equal(update.product.cjOriginalCostUsd, 6.62);
+  assert.equal(update.product.cjOriginalCostCurrency, 'USD');
+  assert.equal(update.product.cjOriginalCostAt, '2026-09-22T01:00:00.000Z');
   assert.equal(update.product.stock, 25);
   assert.equal(update.product.cjStock, 0);
   assert.equal(update.product.salePrice, 650);
@@ -103,6 +106,9 @@ test('latest positive relational snapshot replaces zero JSON cost', () => {
       currency: 'USD',
       availableStock: '0',
       capturedAt: '2026-09-22T01:00:00.000Z',
+      originalProductCost: '5.9900',
+      originalCurrency: 'USD',
+      originalCapturedAt: '2026-08-01T01:00:00.000Z',
     },
   );
 
@@ -111,4 +117,6 @@ test('latest positive relational snapshot replaces zero JSON cost', () => {
   assert.equal(product.cjStock, 0);
   assert.equal(product.stock, 25);
   assert.equal(product.lastCjSyncAt, '2026-09-22T01:00:00.000Z');
+  assert.equal(product.cjOriginalCostUsd, 5.99);
+  assert.equal(product.cjOriginalCostAt, '2026-08-01T01:00:00.000Z');
 });
