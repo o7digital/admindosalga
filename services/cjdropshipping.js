@@ -271,6 +271,24 @@ export const getCjProductImage = async (input) => {
   return imageUrl;
 };
 
+export const searchCjProducts = async (keyword) => {
+  const value = String(keyword || '').replace(/&#8217;|&apos;/g, "'").replace(/&amp;/g, '&').trim();
+  if (!value) throw new Error('A product name or CJ SKU is required.');
+  const payload = await cjRequest('/product/listV2', {
+    query: { page: 1, size: 20, keyWord: value.slice(0, 180) },
+  });
+  return (Array.isArray(payload.data?.content) ? payload.data.content : [])
+    .flatMap((group) => Array.isArray(group?.productList) ? group.productList : [])
+    .map((product) => ({
+      pid: String(product.id || '').trim(),
+      cjSku: String(product.sku || product.spu || '').trim(),
+      name: String(product.nameEn || '').trim(),
+      cjCost: parseCjPrice(product.nowPrice) || parseCjPrice(product.sellPrice),
+      currency: 'USD',
+      imageUrl: String(product.bigImage || '').trim(),
+    }));
+};
+
 export const syncCjProduct = async (product, { includeFreight = false } = {}) => {
   const imported = await importCjProduct({
     query: product.pid || product.cjSku || product.sku || product.cjProductUrl,
