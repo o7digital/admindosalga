@@ -195,7 +195,7 @@ const destinationCountryCode = (destination) => {
   return 'US';
 };
 
-const getLogistics = async (variant, destination) => {
+export const getLogistics = async (variant, destination) => {
   if (!variant?.vid) return [];
 
   const payload = await cjRequest('/logistic/freightCalculate', {
@@ -212,9 +212,10 @@ const getLogistics = async (variant, destination) => {
       origin: 'CJ · China',
       destination: destinationCountryCode(destination) === 'MX' ? 'México' : 'USA',
       method: route.logisticName || 'CJ logistics',
-      shippingCost: asNumber(route.totalPostageFee ?? route.logisticPrice),
+      shippingCost: Number(route.totalPostageFee ?? route.logisticPrice),
       ...parseAging(route.logisticAging),
     }))
+    .filter(route => Number.isFinite(route.shippingCost) && route.shippingCost >= 0)
     .sort((left, right) => left.shippingCost - right.shippingCost);
 };
 
@@ -365,4 +366,13 @@ export const saveCjShopVariants = async (shopId, variants) => {
   const response = await cjRequest('/store/product/saveVariantBatch', { method: 'POST', body: { shopId, variants } });
   const results = Array.isArray(response.data) ? response.data : [];
   return { requestId: response.requestId, results };
+};
+
+export const getCjFreightVariants = async (product) => {
+  const result = await queryProduct(product.pid || product.cjSku || product.sku);
+  return (result.data.variants || []).filter(variant => variant.vid).map(variant => ({
+    vid: String(variant.vid), sku: String(variant.variantSku || variant.vid),
+    name: String(variant.variantKey || variant.variantNameEn || variant.variantSku || variant.vid),
+    cjCostUsd: variantPrice(variant), routes: [],
+  }));
 };

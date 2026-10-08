@@ -512,3 +512,9 @@ button.insight-row:hover { color: var(--red-dark); }
 .audit-item.critical { background: #fff0f0; border-color: #df9c9c; }
 .audit-item button { border: 0; background: none; text-align: left; font-weight: 700; color: #a51927; cursor: pointer; }
 .audit-item p { line-height: 1.5; }
+
+.variant-freight { min-width: 220px; margin-bottom: 12px; }
+.variant-freight .btn { margin: 8px 0; padding: 7px 10px; font-size: 12px; }
+.variant-freight details summary { cursor: pointer; font-weight: 700; }
+.variant-freight select { display: block; max-width: 260px; margin: 6px 0; }
+.variant-freight-row { padding: 8px 0; border-bottom: 1px solid var(--line); }

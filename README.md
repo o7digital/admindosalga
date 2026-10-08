@@ -147,3 +147,17 @@ les variations. L'état `woo_verified` n'est enregistré qu'après confirmation 
 Le statut public WooCommerce est vérifié avant toute écriture : un produit brouillon,
 masqué ou non achetable y est refusé. Un ancien statut « off shelf » dans CJ ne bloque
 pas la mise à jour, car `saveProduct` sert précisément à réenregistrer la fiche active.
+
+Le bouton **Transport par variante** dans le catalogue récupère les variantes CJ
+(pointure, couleur, taille ou autre SKU), puis demande séquentiellement un devis
+par variante pour une unité, depuis la Chine vers la destination du produit.
+Les devis sont enregistrés dans Railway (`store_listings.metadata.variantFreight`)
+et restent conservés lors des imports WooCommerce et des modifications de fiche.
+Le détail affiche coût CJ, transport, total, délai et marge estimée par SKU.
+La méthode de livraison peut être choisie parmi les routes retournées par CJ ;
+une variante sans devis pour cette méthode reste non confirmée. La fourchette
+et la marge minimale utilisent uniquement les variantes confirmées et sont
+signalées comme provisoires si la couverture est incomplète. Dans ce cas, la
+suggestion automatique de prix est indisponible. Les marges utilisent le prix de
+vente produit affiché : elles nécessitent une vérification si WooCommerce vend
+ses variantes à des prix différents. Aucun prix boutique n'est publié par ce bouton.
