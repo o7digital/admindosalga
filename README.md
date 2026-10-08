@@ -161,3 +161,13 @@ signalées comme provisoires si la couverture est incomplète. Dans ce cas, la
 suggestion automatique de prix est indisponible. Les marges utilisent le prix de
 vente produit affiché : elles nécessitent une vérification si WooCommerce vend
 ses variantes à des prix différents. Aucun prix boutique n'est publié par ce bouton.
+
+Le taux de référence USD/MXN affiché dans le catalogue provient directement de
+l'historique DOLAR (indicateur 158) du Diario Oficial de la Federación. L'admin
+vérifie le taux à l'ouverture, au retour sur l'onglet et chaque heure tant qu'il
+reste visible. Le cache serveur expire après 15 minutes et au changement de
+jour à Mexico. La date affichée est celle de la dernière publication disponible,
+y compris les week-ends et jours fériés. Les taux enregistrés sur les produits
+restent distincts. Une panne du DOF est signalée ; aucun taux d'une autre source
+n'est présenté comme officiel. Les devises et prix des produits ne sont pas
+modifiés automatiquement par l'actualisation de cet affichage.

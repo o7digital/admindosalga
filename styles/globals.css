@@ -518,3 +518,5 @@ button.insight-row:hover { color: var(--red-dark); }
 .variant-freight details summary { cursor: pointer; font-weight: 700; }
 .variant-freight select { display: block; max-width: 260px; margin: 6px 0; }
 .variant-freight-row { padding: 8px 0; border-bottom: 1px solid var(--line); }
+.daily-fx-badge small { display: block; margin-top: 5px; font-weight: 500; }
+.daily-fx-badge a { color: inherit; }

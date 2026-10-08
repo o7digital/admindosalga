@@ -353,7 +353,6 @@ export default function ProductControl() {
 
   useEffect(() => {
     loadProducts().catch((loadError) => setError(loadError.message || 'Products could not be loaded.'));
-    fetch('/api/exchange-rate', { cache: 'no-store' }).then((response) => response.json()).then(setFx).catch(() => {});
     loadCjConnection().catch((loadError) => {
       setCjConnection({ configured: true, connected: false, mode: 'error', message: loadError.message });
     });
@@ -373,6 +372,31 @@ export default function ProductControl() {
       window.clearInterval(interval);
       window.removeEventListener('focus', refreshFromRailway);
       document.removeEventListener('visibilitychange', refreshFromRailway);
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    const refreshOfficialRate = async () => {
+      if (document.visibilityState !== 'visible') return;
+      try {
+        const response = await fetch('/api/exchange-rate', { cache: 'no-store' });
+        const result = await response.json();
+        if (!response.ok || !(result.rate > 0)) throw new Error(result.message || 'DOF indisponible');
+        if (active) setFx(result);
+      } catch {
+        if (active) setFx(current => current?.rate ? { ...current, stale: true } : { stale: true });
+      }
+    };
+    refreshOfficialRate();
+    const interval = window.setInterval(refreshOfficialRate, 60 * 60 * 1000);
+    window.addEventListener('focus', refreshOfficialRate);
+    document.addEventListener('visibilitychange', refreshOfficialRate);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+      window.removeEventListener('focus', refreshOfficialRate);
+      document.removeEventListener('visibilitychange', refreshOfficialRate);
     };
   }, []);
 
@@ -999,7 +1023,7 @@ export default function ProductControl() {
                 <label className="select-wrap"><select value={shippingFilter} onChange={(event) => setShippingFilter(event.target.value)}><option>All shipping</option><option>Included</option><option>Separate</option></select><Icon name="chevron" size={15} /></label>
                 <label className="select-wrap"><select value={marginFilter} onChange={(event) => setMarginFilter(event.target.value)}><option>All margins</option><option>Under 35%</option><option>35% and up</option></select><Icon name="chevron" size={15} /></label>
                 <button className="export" type="button" onClick={() => { setShowAllProducts((value) => !value); setPage(1); }}>{showAllProducts ? 'Paginer' : 'Voir toute la liste'}</button>
-                {fx?.rate && <span className="daily-fx-badge">Tipo de cambio du jour · {fx.rate} MXN/USD · {fx.date}</span>}
+                <div className="daily-fx-badge">{fx?.rate ? <><a href={fx.sourceUrl} target="_blank" rel="noreferrer">Taux officiel DOF · 1 USD = {Number(fx.rate).toFixed(4)} MXN</a><small>1 MXN = {(1 / Number(fx.rate)).toFixed(6)} USD · Dernière publication : {fx.date}</small><small>{fx.stale ? '⚠ Actualisation indisponible · dernier taux récupéré' : 'Actualisation automatique · vérification chaque heure'}</small></> : 'Taux officiel DOF indisponible'}</div>
                 <span className="result-count">{filtered.length} shown · Priority first</span>
               </div>
               <div className="table-wrap">
@@ -1015,7 +1039,7 @@ export default function ProductControl() {
                       <tr key={product.id} className={publishedCurrent ? 'price-success-row' : audit.critical ? 'price-alert-row' : ''}>
                         <td><div className="product-cell"><ProductVisual product={product} /><div><strong>{product.productUrl ? <a href={product.productUrl} target="_blank" rel="noreferrer">{product.name}</a> : product.name}</strong><span>{product.brand} · {product.sku}</span><small className={`status ${product.wooFrozen ? 'blocked' : product.status === 'paused' || product.status === 'review' ? 'review' : product.stock <= 10 ? 'low-stock' : ''}`}>{product.wooFrozen ? 'Bloqué dans WooCommerce' : product.status}</small>{audit.issues.length > 0 && <small className="product-alert-reason">⚠ {audit.issues[0].message}</small>}{product.wooFrozen ? <span className="sale-blocked-badge">⛔ Vente bloquée</span> : <button type="button" className="block-sale-button" disabled={blockingProductId === product.id} onClick={() => blockProductSale(product)}>{blockingProductId === product.id ? 'Blocage…' : 'Bloquer la vente'}</button>}</div></div></td>
                         <td><span className={`market-badge ${marketFor(product) === 'USA' ? 'usa' : 'mexico'}`}>{marketFor(product) !== 'Both' && <span className={`flag ${marketFor(product) === 'USA' ? 'us' : 'mx'}`} />}{marketFor(product)}</span></td>
-                        <td className="number"><strong className="new-sale-price">1 USD = {margin.exchangeRate.toFixed(4)} MXN</strong><small>1 MXN = {(1 / margin.exchangeRate).toFixed(6)} USD</small><small>Taux enregistré sur ce produit</small><small>{product.sourceCurrency === 'USD' && product.saleCurrency === 'MXN' ? `${formatCurrency(product.sourcePrice, 'USD')} × ${product.exchangeRate} = ${formatCurrency(product.salePrice, 'MXN')}` : 'Prix natif : aucune conversion du prix'}</small><strong className="daily-fx-value">FX du jour : {fx?.rate ? `1 USD = ${Number(fx.rate).toFixed(4)} MXN` : '—'}</strong><small>{fx?.date ? `${fx.date} · ${fx.source}` : 'Taux du jour indisponible'}</small>{fx?.rate && <small className={Math.abs(Number(product.exchangeRate) - Number(fx.rate)) > 0.01 ? 'danger-text' : 'included'}>Écart : {(Number(product.exchangeRate) - Number(fx.rate)).toFixed(4)}</small>}<small>{product.priceRegistry?.decisionSource || 'Railway'}</small></td>
+                        <td className="number"><strong className="new-sale-price">1 USD = {margin.exchangeRate.toFixed(4)} MXN</strong><small>1 MXN = {(1 / margin.exchangeRate).toFixed(6)} USD</small><small>Taux enregistré sur ce produit</small><small>{product.sourceCurrency === 'USD' && product.saleCurrency === 'MXN' ? `${formatCurrency(product.sourcePrice, 'USD')} × ${product.exchangeRate} = ${formatCurrency(product.salePrice, 'MXN')}` : 'Prix natif : aucune conversion du prix'}</small><strong className="daily-fx-value">FX officiel DOF : {fx?.rate ? `1 USD = ${Number(fx.rate).toFixed(4)} MXN` : '—'}</strong><small>{fx?.date ? `Publié le ${fx.date} · ${fx.source}` : 'Taux officiel DOF indisponible'}</small>{fx?.rate && <small className={Math.abs(Number(product.exchangeRate) - Number(fx.rate)) > 0.01 ? 'danger-text' : 'included'}>Écart : {(Number(product.exchangeRate) - Number(fx.rate)).toFixed(4)}</small>}{fx?.stale && <small className="danger-text">⚠ Dernier taux récupéré · actualisation indisponible</small>}<small>{product.priceRegistry?.decisionSource || 'Railway'}</small></td>
                         <td><span className={`currency-pill ${product.currencyMismatch ? 'currency-mismatch' : ''}`}>{product.saleCurrency}</span><strong className="railway-price-value">{formatCurrency(product.salePrice, product.saleCurrency)}</strong><small className="currency-source">Origine Railway : {formatCurrency(product.sourcePrice, product.sourceCurrency)}</small><small className="currency-source">Final Railway : {formatCurrency(product.salePrice, product.saleCurrency)}</small><small className={product.priceRegistry?.verified ? 'included' : 'danger-text'}>{product.priceRegistry?.verified ? '● Devise vérifiée par produit' : '⚠ Devise à vérifier'}</small>{product.priceImportRule === 'caps-native-mxn-v1' && <small className="currency-source native-price-rule">CAPS · prix natif MXN</small>}{product.currencyMismatch && <small className="danger-text">Expected {product.expectedStoreCurrency}</small>}</td>
                         <td className="number"><strong>{formatCurrency(product.cjCostUsd, 'USD')}</strong><small>Prix CJ d’origine : {product.cjOriginalCostUsd > 0 ? formatCurrency(product.cjOriginalCostUsd, product.cjOriginalCostCurrency || 'USD') : 'à importer'}</small><small>{product.cjOriginalCostAt ? `Première capture : ${new Date(product.cjOriginalCostAt).toLocaleDateString()}` : product.cjSku || product.pid}</small></td>
                         <td><VariantFreight product={product} onUpdated={(id, freight) => setProducts(current => current.map(item => item.id === id ? { ...item, variantFreight: freight } : item))} />{!product.variantFreight && <><strong>{product.shippingConfirmed || Number(product.shippingUsd) > 0 ? formatCurrency(product.shippingUsd, 'USD') : 'À synchroniser depuis CJ'}</strong>{(product.shippingConfirmed || Number(product.shippingUsd) > 0) && <small>{formatCurrency(product.shippingUsd, 'USD')} × FX produit {product.exchangeRate} = {formatCurrency(Number(product.shippingUsd) * Number(product.exchangeRate), 'MXN')}</small>}<small>{product.shippingDestination} · {product.minDeliveryDays}-{product.maxDeliveryDays} days</small>{product.shippingConfirmedAt && <small>Confirmé CJ : {new Date(product.shippingConfirmedAt).toLocaleDateString()}</small>}</>}</td>
