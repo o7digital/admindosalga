@@ -44,7 +44,7 @@ export default async function handler(req, res) {
     const woo = await publishWooPrice(identity, proposal.price, product.sku, {
       currency: product.saleCurrency,
       sourceCurrency: product.sourceCurrency,
-      exchangeRate: product.exchangeRate,
+      exchangeRate: proposal.exchangeRate || product.exchangeRate,
     });
     const verified = woo.currencyVerified && woo.updated.length > 0 && woo.updated.every(item => Number(item.price) === Number(proposal.price));
     if (!verified) throw new Error('WooCommerce did not confirm the new price on every product or variation.');
@@ -57,7 +57,7 @@ export default async function handler(req, res) {
       previousPrice: Number(product.salePrice),
       price: proposal.price,
       currency: proposal.currency,
-      exchangeRate: product.exchangeRate,
+      exchangeRate: proposal.exchangeRate || product.exchangeRate,
       wooVerified: true,
       wooUpdated: woo.updated.length,
     };

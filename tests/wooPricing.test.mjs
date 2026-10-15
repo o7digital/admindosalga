@@ -31,3 +31,14 @@ test('other MX prices stay in pesos; old global conversions are restored exactly
   const oldWatch = { ...watch, salePrice: 412.41, sourceSalePriceUsd: 23.58, priceNormalization: 'woo-mx-usd-v1' };
   assert.equal(normalizeWooPrice(oldWatch).salePrice, 412.41);
 });
+
+
+test('published and registry final prices survive normalization despite zero import', () => {
+  const product = { id: '1090', saleCurrency: 'MXN', salePrice: 1090, sourcePrice: 0, sourceCurrency: 'MXN' };
+  const registered = { ...product, priceRegistry: { finalPrice: 1090, verified: true } };
+  assert.equal(normalizeWooPrice(registered).salePrice, 1090);
+  const published = { ...product, salePrice: 0, wooPricePublication: { state: 'woo_verified', price: 1090, currency: 'MXN' } };
+  assert.equal(normalizeWooPrice(published).salePrice, 1090);
+  assert.equal(normalizeWooPrice(normalizeWooPrice(published)).salePrice, 1090);
+  assert.equal(normalizeWooPrice(published).sourcePrice, 0);
+});

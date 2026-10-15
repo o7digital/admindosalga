@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { calculateProductMargin, formatCurrency, formatPercent } from '@/lib/margins';
 import { suggestCjPrice } from '@/lib/cjPricing.mjs';
 
@@ -8,14 +8,36 @@ export default function CjPriceCell({ product, onSaved, onPublished, disabled })
   const [price, setPrice] = useState(saved?.price ?? suggestCjPrice(product, shippingIncluded) ?? '');
   const [minDays, setMinDays] = useState(saved?.minDeliveryDays ?? product.minDeliveryDays ?? '');
   const [maxDays, setMaxDays] = useState(saved?.maxDeliveryDays ?? product.maxDeliveryDays ?? '');
+  const touched = useRef(false);
+  const [ai, setAi] = useState(null);
+  const [suggesting, setSuggesting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [publication, setPublication] = useState(product.wooPricePublication || null);
+  useEffect(() => { setPublication(product.wooPricePublication || null); }, [product.wooPricePublication]);
   const suggestion = suggestCjPrice(product, shippingIncluded);
   const margin = calculateProductMargin({ ...product, salePrice: Number(price), shippingIncluded });
   const unchanged = saved && Number(price) === saved.price && shippingIncluded === saved.shippingIncluded
     && Number(minDays) === saved.minDeliveryDays && Number(maxDays) === saved.maxDeliveryDays;
-  const publishedCurrent = publication?.state === 'woo_verified' && publication?.proposalSavedAt === saved?.savedAt;
+  const publishedCurrent = unchanged && publication?.state === 'woo_verified' && publication?.proposalSavedAt === saved?.savedAt;
+
+  useEffect(() => {
+    if (!touched.current && !saved && suggestion !== null) setPrice(suggestion);
+  }, [suggestion, saved]);
+
+  const suggestAi = async () => {
+    setSuggesting(true); setError('');
+    try {
+      const response = await fetch('/api/ai/price-suggestion', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ productId: product.id, shippingIncluded }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || 'Suggestion IA indisponible.');
+      touched.current = true; setPrice(result.price); setAi(result);
+    } catch (failure) { setError(failure.message); }
+    finally { setSuggesting(false); }
+  };
 
   const save = async (event) => {
     event.preventDefault();
@@ -56,15 +78,18 @@ export default function CjPriceCell({ product, onSaved, onPublished, disabled })
 
   return <td className="cj-price-cell"><form onSubmit={save} aria-label={`Update WooCommerce price for ${product.name}`}>
     <fieldset disabled={saving || disabled}>
-      <label>WooCommerce price · {product.saleCurrency}<input aria-label={`WooCommerce price for ${product.name}`} type="number" min="0.01" max="99999999.99" step="0.01" required value={price} onChange={(event) => setPrice(event.target.value)} /></label>
+      <label>WooCommerce price · {product.saleCurrency}<input aria-label={`WooCommerce price for ${product.name}`} type="number" min="0.01" max="99999999.99" step="0.01" required value={price} onChange={(event) => { touched.current = true; setAi(null); setPrice(event.target.value); }} /></label>
       <label className="cj-shipping-choice"><input type="checkbox" checked={shippingIncluded} onChange={(event) => setShippingIncluded(event.target.checked)} />{shippingIncluded ? 'Shipping included' : 'Shipping charged separately'}</label>
       <div className="cj-eta"><label>ETA min · days<input aria-label={`Minimum delivery days for ${product.name}`} type="number" min="1" max="365" step="1" required value={minDays} onChange={(event) => setMinDays(event.target.value)} /></label><label>ETA max · days<input aria-label={`Maximum delivery days for ${product.name}`} type="number" min={Number(minDays) || 1} max="365" step="1" required value={maxDays} onChange={(event) => setMaxDays(event.target.value)} /></label></div>
-      {suggestion !== null ? <button className="cj-suggestion" type="button" onClick={() => setPrice(suggestion)}>Use suggested {formatCurrency(suggestion, product.saleCurrency)}<small>35% margin target · configured fees / taxes</small></button> : <small className="cj-price-note">Add CJ cost{shippingIncluded ? ' and shipping cost' : ''} to calculate a suggestion. You can enter a price manually.</small>}
+      {suggestion !== null ? <button className="cj-suggestion" type="button" onClick={() => { touched.current = true; setAi(null); setPrice(suggestion); }}>Use suggested {formatCurrency(suggestion, product.saleCurrency)}<small>35% margin target · configured fees / taxes</small></button> : <small className="cj-price-note">Add CJ cost{shippingIncluded ? ' and shipping cost' : ''} to calculate a suggestion. You can enter a price manually.</small>}
       {suggestion !== null && Number(price) > 0 && <small className={margin.marginRate < 0.35 ? 'separate' : 'included'}>Estimated margin: {formatPercent(margin.marginRate)}</small>}
+      <button type="button" className="cj-suggestion" disabled={suggesting || suggestion === null} onClick={suggestAi}>{suggesting ? 'Hugging Face…' : 'Suggérer et remplir avec l’IA'}</button>
+      {ai && <small>Hugging Face · {ai.reason} · FX {ai.exchangeRate} ({ai.fxDate})</small>}
       <button type="submit" className="cj-save" disabled={unchanged}>{saving ? 'Saving…' : unchanged ? 'Draft saved' : 'Save price draft'}</button>
     </fieldset>
     <small className="cj-price-note" role="status">{unchanged ? (publication?.proposalSavedAt === saved.savedAt ? 'WooCommerce status below' : 'Saved in admin · ready for WooCommerce') : 'Draft · confirm delivery estimates before saving'}</small>
     {unchanged && !publishedCurrent && <button className="cj-save" type="button" disabled={saving || disabled || ['sending', 'unknown'].includes(publication?.state)} onClick={publish}>{saving ? 'Updating…' : 'Update WooCommerce now'}</button>}
+    {!unchanged && <small>Prix modifié : enregistrez le brouillon puis cliquez sur « Update WooCommerce now ».</small>}
     {publishedCurrent && <p role="status" className="woo-confirmation">✓ Confirmed in WooCommerce: {formatCurrency(publication.price, publication.currency)}</p>}
     {publication && !publishedCurrent && publication.state !== 'woo_verified' && <p role="status" className="cj-price-note">{publication.message || 'WooCommerce publication in progress; do not resend.'}</p>}
     {saved && <small>Saved {new Date(saved.savedAt).toLocaleString()}</small>}

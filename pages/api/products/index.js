@@ -1,3 +1,4 @@
+import { getLatestOfficialRate } from '@/lib/officialExchangeRate.mjs';
 import { normalizeWooPrice } from '@/lib/wooPricing.mjs';
 import fs from 'fs/promises';
 import path from 'path';
@@ -76,7 +77,12 @@ export default async function handler(req, res) {
     if (req.method === 'GET') {
       res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
       const products = databaseIsAvailable() ? await listDatabaseProducts() : await readProducts();
-      return res.status(200).json({ products: products.map(normalizeWooPrice), source: databaseIsAvailable() ? 'postgresql' : 'json' });
+      const official = await getLatestOfficialRate().catch(() => null);
+      const normalized = products.map(normalizeWooPrice).map(product => official && !official.stale ? {
+        ...product, storedExchangeRate: product.exchangeRate, exchangeRate: official.rate,
+        fxRateDate: official.date, fxSource: official.source,
+      } : product);
+      return res.status(200).json({ products: normalized, source: databaseIsAvailable() ? 'postgresql' : 'json' });
     }
 
     if (req.method === 'POST') {

@@ -8,7 +8,7 @@ export default function VariantFreight({ product, onUpdated }) {
   const [error, setError] = useState('');
   const freight = product.variantFreight;
   const summary = variantFreightSummary(product);
-  const methods = [...new Set(freight?.variants.flatMap(item => item.routes?.map(route => route.method) || []) || [])];
+  const methods = [...new Set(freight?.variants?.flatMap(item => item.routes?.map(route => route.method) || []) || [])];
   const request = async (body) => {
     const response = await fetch('/api/cj/variant-freight', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ productId: product.id, ...body }) });
     const result = await response.json();
@@ -37,8 +37,8 @@ export default function VariantFreight({ product, onUpdated }) {
     }}>{!freight.method && <option value="">À confirmer</option>}{freight.method && !methods.includes(freight.method) && <option>{freight.method}</option>}{methods.map(method => <option key={method}>{method}</option>)}</select></label>
       {summary.rows.map(row => {
         const margin = row.confirmed ? calculateProductMargin({ ...product, variantFreight: null, cjCostUsd: row.cjCostUsd, shippingUsd: row.route.shippingCost }) : null;
-        return <div className="variant-freight-row" key={row.vid}><strong>{row.name}</strong><small>{row.sku}</small><small>Coût CJ : {formatCurrency(row.cjCostUsd, 'USD')}</small>{row.confirmed ? <><small>Transport : {formatCurrency(row.route.shippingCost, 'USD')} · {row.route.minDeliveryDays}–{row.route.maxDeliveryDays} jours</small><small>Total CJ + transport : {formatCurrency(row.cjCostUsd + row.route.shippingCost, 'USD')}</small><small className={margin.profit < 0 ? 'danger-text' : ''}>Marge estimée : {formatPercent(margin.marginRate)} · {formatCurrency(margin.profit, margin.saleCurrency)}</small></> : <small className="danger-text">{row.error || 'Devis ou coût non confirmé pour cette méthode'}</small>}</div>;
-      })}<small>Marges estimées au prix de vente produit affiché ; à vérifier si les prix WooCommerce varient par SKU.</small>
+        return <div className="variant-freight-row" key={row.vid}><strong>{row.name}</strong><small>{row.sku}</small><small>Coût CJ : {formatCurrency(row.cjCostUsd, 'USD')}</small>{row.confirmed ? <><small>Transport : {formatCurrency(row.route.shippingCost, 'USD')} · {row.route.minDeliveryDays}–{row.route.maxDeliveryDays} jours</small><small>Transport MXN : {formatCurrency(row.route.shippingCost * product.exchangeRate, 'MXN')} · FX {product.exchangeRate}</small><small>Total CJ + transport : {formatCurrency(row.cjCostUsd + row.route.shippingCost, 'USD')}</small><small className={margin.profit < 0 ? 'danger-text' : ''}>Marge estimée : {formatPercent(margin.marginRate)} · {formatCurrency(margin.profit, margin.saleCurrency)}</small></> : <small className="danger-text">{row.error || 'Devis ou coût non confirmé pour cette méthode'}</small>}</div>;
+      })}<details><summary>Tous les tarifs et méthodes CJ</summary>{freight.variants.map(variant => <div key={variant.vid}><strong>{variant.name || variant.sku}</strong>{variant.routes?.map(route => <small key={route.method}>{route.method} : {formatCurrency(route.shippingCost, 'USD')} · {route.minDeliveryDays}–{route.maxDeliveryDays} jours</small>)}</div>)}</details><small>Marges estimées au prix de vente produit affiché ; à vérifier si les prix WooCommerce varient par SKU.</small>
     </details>}
   </div>;
 }

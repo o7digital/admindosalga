@@ -1,3 +1,4 @@
+import { getLatestOfficialRate } from '@/lib/officialExchangeRate.mjs';
 import { databaseIsAvailable, saveCjPriceProposal } from '@/lib/productRepository';
 import { validateCjPriceProposal } from '@/lib/cjPricing.mjs';
 
@@ -16,6 +17,9 @@ export default async function handler(req, res) {
   }
   if (!databaseIsAvailable()) return res.status(503).json({ message: 'PostgreSQL is required to save CJ price proposals.' });
   try {
+    const official = await getLatestOfficialRate();
+    if (official.stale) throw new Error('Taux officiel indisponible. Réessayez.');
+    proposal = { ...proposal, exchangeRate: official.rate, fxRateDate: official.date };
     const saved = await saveCjPriceProposal(productId, proposal);
     if (!saved) return res.status(409).json({ message: 'Listing unavailable or currency changed. Reload the catalogue.' });
     return res.status(200).json({ proposal: saved });
