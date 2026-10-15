@@ -1,4 +1,4 @@
-import { createCjRequestQueue, isCjRateLimit } from '../lib/cjRequestQueue.mjs';
+import { createCjRequestQueue, isCjRateLimit, isCjAccessDisabled } from '../lib/cjRequestQueue.mjs';
 import { applyCjCostUpdate, parseCjPrice } from '../lib/cjData.mjs';
 
 const CJ_API_BASE_URL = process.env.CJ_API_BASE_URL || 'https://developers.cjdropshipping.com/api2.0/v1';
@@ -151,7 +151,7 @@ const queryProduct = async (input) => {
       const payload = await cjRequest('/product/query', { query });
       if (payload.data) return { data: payload.data, identifier };
     } catch (error) {
-      if (isCjRateLimit(error) || /points|token|unauthorized|expired/i.test(error.message)) throw error;
+      if (isCjAccessDisabled(error) || isCjRateLimit(error) || /points|token|unauthorized|expired/i.test(error.message)) throw error;
       lastError = error;
     }
   }

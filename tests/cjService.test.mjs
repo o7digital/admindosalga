@@ -20,5 +20,12 @@ test('CJ variant loading recovers from a QPS error delivered with HTTP 200', asy
     assert.equal(calls[0].url, calls[1].url);
     assert.equal(calls[1].token, 'test-token');
     assert.deepEqual(variants, [{ vid: 'v1', sku: 'SKU-L', name: 'L', cjCostUsd: 5.07, routes: [] }]);
+    let deniedCalls = 0;
+    global.fetch = async () => {
+      deniedCalls++;
+      return { ok: true, status: 200, json: async () => ({ result: false, message: 'Your API access has been disabled. Please reactivate it.' }) };
+    };
+    await assert.rejects(getCjFreightVariants({ cjSku: 'CJ-SKU' }), /access has been disabled/);
+    assert.equal(deniedCalls, 1, 'a disabled account must not trigger alternate SKU requests');
   } finally { global.fetch = original; }
 });

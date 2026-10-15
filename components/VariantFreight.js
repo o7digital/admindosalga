@@ -7,6 +7,7 @@ export default function VariantFreight({ product, onUpdated }) {
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState('');
   const [error, setError] = useState('');
+  const [actionUrl, setActionUrl] = useState('');
   const freight = product.variantFreight;
   const summary = variantFreightSummary(product);
   const methods = [...new Set(freight?.variants?.flatMap(item => item.routes?.map(route => route.method) || []) || [])];
@@ -18,14 +19,17 @@ export default function VariantFreight({ product, onUpdated }) {
       await new Promise(resolve => setTimeout(resolve, 5000));
       return request(body, attempt + 1);
     }
-    if (!response.ok) throw new Error(result.message || 'Devis indisponible');
+    if (!response.ok) {
+      if (result.code === 'CJ_ACCESS_DISABLED') setActionUrl('https://www.cjdropshipping.com/my.html#/authorize/APIStores');
+      throw new Error(result.message || 'Devis indisponible');
+    }
     onUpdated(product.id, result.freight);
     return result.freight;
   };
   const sync = async () => {
     if (running.current) return;
     running.current = true;
-    setBusy(true); setError(''); setProgress('Chargement des variantes…');
+    setBusy(true); setError(''); setActionUrl(''); setProgress('Chargement des variantes…');
     try {
       const session = await request({ action: 'start' });
       for (const [index, variant] of session.variants.entries()) {
@@ -39,6 +43,7 @@ export default function VariantFreight({ product, onUpdated }) {
     {summary && <><strong>{summary.min === null ? 'Transport non confirmé' : `${formatCurrency(summary.min, 'USD')} – ${formatCurrency(summary.max, 'USD')}`}</strong><small className={summary.complete ? 'included' : 'danger-text'}>{summary.confirmed}/{summary.rows.length} variantes confirmées · {summary.complete ? 'Marge minimale calculée' : 'Marge provisoire : devis manquants'}</small><small>{freight.origin} → {freight.destination} · quantité 1 · {new Date(freight.capturedAt).toLocaleString()}</small></>}
     <button type="button" className="btn secondary" disabled={busy} onClick={sync}>{busy ? `Devis CJ ${progress}` : 'Transport par variante'}</button>
     {error && <small className="danger-text" role="alert">{error}</small>}
+    {actionUrl && <a href={actionUrl} target="_blank" rel="noreferrer">Réactiver l’accès API dans CJ ↗</a>}
     {summary && <details open><summary>Détail par taille / couleur / SKU</summary><label>Méthode de livraison<select value={freight.method} disabled={busy} onChange={async event => {
       setBusy(true); setError('');
       try { await request({ action: 'method', method: event.target.value }); } catch (failure) { setError(failure.message); } finally { setBusy(false); }

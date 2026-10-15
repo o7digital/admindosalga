@@ -1,4 +1,4 @@
-import { isCjRateLimit } from '@/lib/cjRequestQueue.mjs';
+import { isCjRateLimit, isCjAccessDisabled } from '@/lib/cjRequestQueue.mjs';
 import { databaseIsAvailable, listProducts, saveVariantFreight } from '@/lib/productRepository';
 import { getCjFreightVariants, getLogistics } from '@/services/cjdropshipping';
 
@@ -23,7 +23,7 @@ export default async function handler(req, res) {
         variant.routes = await getLogistics(variant, freight.destination);
         variant.error = variant.routes.length ? null : 'Aucune route disponible';
       } catch (error) {
-        if (isCjRateLimit(error)) throw error;
+        if (isCjRateLimit(error) || isCjAccessDisabled(error)) throw error;
         variant.routes = []; variant.error = error.message;
       }
       variant.quotedAt = new Date().toISOString();
@@ -35,6 +35,11 @@ export default async function handler(req, res) {
     if (!await saveVariantFreight(product.id, freight)) throw new Error('Enregistrement du devis impossible.');
     res.status(200).json({ freight });
   } catch (error) {
+    if (isCjAccessDisabled(error)) {
+      return res.status(403).json({ code: 'CJ_ACCESS_DISABLED',
+        message: 'CJ a désactivé l’accès API de votre compte. Réactivez-le dans CJ, puis relancez le transport par variante.',
+        actionUrl: 'https://www.cjdropshipping.com/my.html#/authorize/APIStores' });
+    }
     if (isCjRateLimit(error)) {
       res.setHeader('Retry-After', '5');
       return res.status(429).json({ retryable: true, message: 'CJ est temporairement occupé. Nouvelle tentative dans 5 secondes…' });

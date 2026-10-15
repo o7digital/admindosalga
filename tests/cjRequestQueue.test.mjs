@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createCjRequestQueue, isCjRateLimit, CJ_INTERVAL_MS } from '../lib/cjRequestQueue.mjs';
+import { createCjRequestQueue, isCjRateLimit, isCjAccessDisabled, CJ_INTERVAL_MS } from '../lib/cjRequestQueue.mjs';
 
 const limited = () => Object.assign(new Error('Too Many Requests, QPS limit is 1 time/1second'), { status: 200 });
 
@@ -48,4 +48,11 @@ test('separate server queues use the same reservation source', async () => {
   const b = createCjRequestQueue({ reserve, wait: async ms => waits.push(ms) });
   await Promise.all([a(async () => 1), b(async () => 2), a(async () => 3)]);
   assert.deepEqual(waits, [CJ_INTERVAL_MS, 2 * CJ_INTERVAL_MS]);
+});
+
+test('disabled CJ account is distinct from temporary rate limits', () => {
+  const error = new Error('Your API access has been disabled. Please visit CJ to reactivate it.');
+  assert.equal(isCjAccessDisabled(error), true);
+  assert.equal(isCjRateLimit(error), false);
+  assert.equal(isCjAccessDisabled(new Error('Product not found')), false);
 });
