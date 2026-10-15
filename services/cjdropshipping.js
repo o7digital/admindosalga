@@ -1,13 +1,17 @@
+import { createCjRequestQueue, isCjRateLimit } from '../lib/cjRequestQueue.mjs';
 import { applyCjCostUpdate, parseCjPrice } from '../lib/cjData.mjs';
 
 const CJ_API_BASE_URL = process.env.CJ_API_BASE_URL || 'https://developers.cjdropshipping.com/api2.0/v1';
 const CJ_REQUEST_TIMEOUT_MS = Number(process.env.CJ_REQUEST_TIMEOUT_MS) || 20000;
-const CJ_REQUEST_INTERVAL_MS = 1100;
+const runCjRequest = createCjRequestQueue({
+  ...(process.env.DATABASE_URL ? { reserve: async () => {
+    const { reserveCjRequestSlot } = await import('../lib/cjRateLimit');
+    return reserveCjRequestSlot();
+  } } : {}),
+});
 
 let cachedToken = null;
-let nextCjRequestAt = 0;
 
-const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
 const getApiKey = () => String(process.env.CJ_API_KEY || process.env.CJDROPSHIPPING_API_KEY || '').trim();
 const getStaticAccessToken = () => String(process.env.CJ_ACCESS_TOKEN || '').trim();
@@ -35,12 +39,11 @@ const fetchJson = async (url, options = {}) => {
     });
     const payload = await response.json().catch(() => null);
 
-    if (!response.ok) {
-      throw new Error(payload?.message || `CJ API returned HTTP ${response.status}`);
-    }
-
-    if (!payload || payload.result === false || payload.success === false) {
-      throw new Error(payload?.message || 'CJ API returned an invalid response');
+    if (!response.ok || !payload || payload.result === false || payload.success === false) {
+      const error = new Error(payload?.message || `CJ API returned HTTP ${response.status}`);
+      error.status = response.status;
+      error.code = payload?.code;
+      throw error;
     }
 
     return payload;
@@ -67,10 +70,10 @@ const getAccessToken = async () => {
     throw new Error('CJ_API_KEY is not configured. Add the CJ API key to the server environment.');
   }
 
-  const payload = await fetchJson(`${CJ_API_BASE_URL}/authentication/getAccessToken`, {
+  const payload = await runCjRequest(() => fetchJson(`${CJ_API_BASE_URL}/authentication/getAccessToken`, {
     method: 'POST',
     body: JSON.stringify({ apiKey }),
-  });
+  }));
   const accessToken = String(payload.data?.accessToken || '').trim();
 
   if (!accessToken) {
@@ -88,9 +91,6 @@ const getAccessToken = async () => {
 
 const cjRequest = async (path, { method = 'GET', query, body } = {}) => {
   const accessToken = await getAccessToken();
-  const delay = Math.max(0, nextCjRequestAt - Date.now());
-  if (delay > 0) await wait(delay);
-  nextCjRequestAt = Date.now() + CJ_REQUEST_INTERVAL_MS;
   const url = new URL(`${CJ_API_BASE_URL}${path}`);
 
   Object.entries(query || {}).forEach(([key, value]) => {
@@ -99,11 +99,11 @@ const cjRequest = async (path, { method = 'GET', query, body } = {}) => {
     }
   });
 
-  return fetchJson(url.toString(), {
+  return runCjRequest(() => fetchJson(url.toString(), {
     method,
     headers: { 'CJ-Access-Token': accessToken },
     ...(body ? { body: JSON.stringify(body) } : {}),
-  });
+  }), { retry: method === 'GET' || path === '/logistic/freightCalculate' });
 };
 
 export const getCjShops = async () => {
@@ -151,6 +151,7 @@ const queryProduct = async (input) => {
       const payload = await cjRequest('/product/query', { query });
       if (payload.data) return { data: payload.data, identifier };
     } catch (error) {
+      if (isCjRateLimit(error) || /points|token|unauthorized|expired/i.test(error.message)) throw error;
       lastError = error;
     }
   }

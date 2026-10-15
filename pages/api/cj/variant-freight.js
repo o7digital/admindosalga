@@ -1,5 +1,8 @@
+import { isCjRateLimit } from '@/lib/cjRequestQueue.mjs';
 import { databaseIsAvailable, listProducts, saveVariantFreight } from '@/lib/productRepository';
 import { getCjFreightVariants, getLogistics } from '@/services/cjdropshipping';
+
+export const config = { maxDuration: 60 };
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ message: 'Method not allowed' });
@@ -19,7 +22,10 @@ export default async function handler(req, res) {
       try {
         variant.routes = await getLogistics(variant, freight.destination);
         variant.error = variant.routes.length ? null : 'Aucune route disponible';
-      } catch (error) { variant.routes = []; variant.error = error.message; }
+      } catch (error) {
+        if (isCjRateLimit(error)) throw error;
+        variant.routes = []; variant.error = error.message;
+      }
       variant.quotedAt = new Date().toISOString();
       if (!freight.method) freight.method = variant.routes[0]?.method || '';
     } else if (req.body.action === 'method') {
@@ -28,5 +34,11 @@ export default async function handler(req, res) {
     } else return res.status(400).json({ message: 'Action inconnue.' });
     if (!await saveVariantFreight(product.id, freight)) throw new Error('Enregistrement du devis impossible.');
     res.status(200).json({ freight });
-  } catch (error) { res.status(502).json({ message: error.message || 'Devis CJ indisponible.' }); }
+  } catch (error) {
+    if (isCjRateLimit(error)) {
+      res.setHeader('Retry-After', '5');
+      return res.status(429).json({ retryable: true, message: 'CJ est temporairement occupé. Nouvelle tentative dans 5 secondes…' });
+    }
+    return res.status(502).json({ message: error.message || 'Devis CJ indisponible.' });
+  }
 }

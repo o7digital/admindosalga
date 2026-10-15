@@ -1,22 +1,30 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { variantFreightSummary } from '@/lib/variantFreight.mjs';
 import { calculateProductMargin, formatCurrency, formatPercent } from '@/lib/margins';
 
 export default function VariantFreight({ product, onUpdated }) {
+  const running = useRef(false);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState('');
   const [error, setError] = useState('');
   const freight = product.variantFreight;
   const summary = variantFreightSummary(product);
   const methods = [...new Set(freight?.variants?.flatMap(item => item.routes?.map(route => route.method) || []) || [])];
-  const request = async (body) => {
+  const request = async (body, attempt = 0) => {
     const response = await fetch('/api/cj/variant-freight', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ productId: product.id, ...body }) });
     const result = await response.json();
+    if (response.status === 429 && result.retryable && attempt < 2) {
+      setProgress('CJ occupé · nouvelle tentative…');
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      return request(body, attempt + 1);
+    }
     if (!response.ok) throw new Error(result.message || 'Devis indisponible');
     onUpdated(product.id, result.freight);
     return result.freight;
   };
   const sync = async () => {
+    if (running.current) return;
+    running.current = true;
     setBusy(true); setError(''); setProgress('Chargement des variantes…');
     try {
       const session = await request({ action: 'start' });
@@ -25,7 +33,7 @@ export default function VariantFreight({ product, onUpdated }) {
         await request({ action: 'quote', vid: variant.vid, capturedAt: session.capturedAt });
       }
     } catch (failure) { setError(failure.message); }
-    finally { setBusy(false); setProgress(''); }
+    finally { running.current = false; setBusy(false); setProgress(''); }
   };
   return <div className="variant-freight">
     {summary && <><strong>{summary.min === null ? 'Transport non confirmé' : `${formatCurrency(summary.min, 'USD')} – ${formatCurrency(summary.max, 'USD')}`}</strong><small className={summary.complete ? 'included' : 'danger-text'}>{summary.confirmed}/{summary.rows.length} variantes confirmées · {summary.complete ? 'Marge minimale calculée' : 'Marge provisoire : devis manquants'}</small><small>{freight.origin} → {freight.destination} · quantité 1 · {new Date(freight.capturedAt).toLocaleString()}</small></>}
