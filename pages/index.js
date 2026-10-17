@@ -8,7 +8,6 @@ import { UserButton } from '@clerk/nextjs';
 import { calculateProductMargin, formatCurrency, formatPercent } from '@/lib/margins';
 
 const logoUrl = 'https://www.dosalga.store/logo-dosalga.png';
-const defaultPageSize = 25;
 const cjBatchSize = 4;
 const productsCacheKey = 'dosalga-admin-products-v2';
 
@@ -276,8 +275,6 @@ export default function ProductControl() {
   const [category, setCategory] = useState('All categories');
   const [shippingFilter, setShippingFilter] = useState('All shipping');
   const [marginFilter, setMarginFilter] = useState('All margins');
-  const [page, setPage] = useState(1);
-  const [showAllProducts, setShowAllProducts] = useState(false);
   const [fx, setFx] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(blankProduct);
@@ -456,10 +453,8 @@ export default function ProductControl() {
     setCategory('All categories');
     setShippingFilter('All shipping');
     setMarginFilter('All margins');
-    setPage(1);
   };
 
-  useEffect(() => setPage(1), [category, marginFilter, market, productTab, query, shippingFilter]);
 
   const metrics = useMemo(() => {
     const active = filtered.filter((product) => product.status !== 'archived');
@@ -524,9 +519,7 @@ export default function ProductControl() {
     unmatched: visibleOrders.reduce((sum, order) => sum + order.unmatchedItems, 0),
   }), [visibleOrders]);
 
-  const pageSize = showAllProducts ? Math.max(filtered.length, 1) : defaultPageSize;
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const pageProducts = filtered.slice((page - 1) * pageSize, page * pageSize);
+  const pageProducts = filtered;
   const currentMargin = calculateProductMargin(editingProduct);
   const cjStatusLabel = cjConnection.mode === 'checking'
     ? 'Checking'
@@ -1004,7 +997,7 @@ export default function ProductControl() {
             {activeView === 'Reporting IA' && (
               <section className="mockup-board">
                 <article className="mockup-panel wide"><h2>Olivia One</h2><p>AI analyst for the full Dosalga dashboard: products, margins, shipping, CJ connection, sponsors, socios and reporting readiness.</p><button className="btn primary report-action" onClick={runOliviaOne} disabled={oliviaLoading}><Icon name="refresh" /> {oliviaLoading ? 'Analyzing...' : 'Run Olivia One'}</button>{oliviaReport && <div className="ai-report"><p>{oliviaReport.mode === 'huggingface' ? 'Hugging Face · AI analysis' : 'Rule-based audit · AI unavailable'} · {oliviaReport.source} · {oliviaReport.summary.totals.products} products</p>{oliviaReport.providerError && <p role="status">{oliviaReport.providerError}</p>}<strong>{oliviaReport.analysis.title}</strong><p>{oliviaReport.analysis.executiveSummary}</p>{oliviaReport.analysis.priorities?.map((item) => <div key={item} className="kanban-row"><span>{item}</span><em>Priority</em></div>)}</div>}</article>
-                {oliviaReport && <article className="mockup-panel wide"><h2>All anomalies · highest priority first ({oliviaReport.summary.anomalies.length})</h2><p>Amounts compared in USD. A currency mismatch requires verification, never automatic conversion.</p>{oliviaReport.summary.anomalies.map(item => <div className={`audit-item ${item.critical ? 'critical' : ''}`} key={item.id}><button onClick={() => { setActiveView('Products'); setMarket('All'); setCategory('All categories'); setShippingFilter('All shipping'); setMarginFilter('All margins'); setQuery(item.sku || item.name); setPage(1); }}>{item.sku} · {item.name}</button><p>{item.siteId} · Store {formatCurrency(item.salePrice, item.currency)} ≈ {formatCurrency(item.saleUsd, 'USD')} · CJ {formatCurrency(item.costUsd, 'USD')}</p>{item.issues.map(issue => <p key={issue.code}><strong>{issue.message}</strong> — {issue.action}</p>)}</div>)}</article>}
+                {oliviaReport && <article className="mockup-panel wide"><h2>All anomalies · highest priority first ({oliviaReport.summary.anomalies.length})</h2><p>Amounts compared in USD. A currency mismatch requires verification, never automatic conversion.</p>{oliviaReport.summary.anomalies.map(item => <div className={`audit-item ${item.critical ? 'critical' : ''}`} key={item.id}><button onClick={() => { setActiveView('Products'); setMarket('All'); setCategory('All categories'); setShippingFilter('All shipping'); setMarginFilter('All margins'); setQuery(item.sku || item.name);  }}>{item.sku} · {item.name}</button><p>{item.siteId} · Store {formatCurrency(item.salePrice, item.currency)} ≈ {formatCurrency(item.saleUsd, 'USD')} · CJ {formatCurrency(item.costUsd, 'USD')}</p>{item.issues.map(issue => <p key={issue.code}><strong>{issue.message}</strong> — {issue.action}</p>)}</div>)}</article>}
                 <article className="mockup-panel"><h2>AI queue</h2><div className="kanban-row"><span>Products to push in ads</span><strong>{marginSummary.best.length}</strong><em>Ready</em></div><div className="kanban-row"><span>Low margin warnings</span><strong>{marginSummary.low.length}</strong><em>Review</em></div><div className="kanban-row"><span>Shipping risk alerts</span><strong>{routeSummary.reduce((sum, route) => sum + route.alerts, 0)}</strong><em>Open</em></div></article>
                 <article className="mockup-panel"><h2>Recommendations</h2>{oliviaReport ? oliviaReport.analysis.recommendations?.map((item) => <p key={item}>{item}</p>) : <p>Run Olivia One to generate operational recommendations from the current dashboard data.</p>}</article>
               </section>
@@ -1030,7 +1023,6 @@ export default function ProductControl() {
                 <label className="select-wrap"><select value={category} onChange={(event) => setCategory(event.target.value)}>{categories.map((item) => <option key={item}>{item}</option>)}</select><Icon name="chevron" size={15} /></label>
                 <label className="select-wrap"><select value={shippingFilter} onChange={(event) => setShippingFilter(event.target.value)}><option>All shipping</option><option>Included</option><option>Separate</option></select><Icon name="chevron" size={15} /></label>
                 <label className="select-wrap"><select value={marginFilter} onChange={(event) => setMarginFilter(event.target.value)}><option>All margins</option><option>Under 35%</option><option>35% and up</option></select><Icon name="chevron" size={15} /></label>
-                <button className="export" type="button" onClick={() => { setShowAllProducts((value) => !value); setPage(1); }}>{showAllProducts ? 'Paginer' : 'Voir toute la liste'}</button>
                 <div className="daily-fx-badge">{fx?.rate ? <><a href={fx.sourceUrl} target="_blank" rel="noreferrer">Taux officiel DOF · 1 USD = {Number(fx.rate).toFixed(4)} MXN</a><small>1 MXN = {(1 / Number(fx.rate)).toFixed(6)} USD · Dernière publication : {fx.date}</small><small>{fx.stale ? '⚠ Actualisation indisponible · dernier taux récupéré' : 'Actualisation automatique · vérification chaque heure'}</small></> : 'Taux officiel DOF indisponible'}</div>
                 <span className="result-count">{filtered.length} shown · Priority first</span>
               </div>
@@ -1070,7 +1062,7 @@ export default function ProductControl() {
                   })}{!pageProducts.length && <tr><td colSpan={16} className="empty">No products match these filters.</td></tr>}</tbody>
                 </table>
               </div>
-              <footer className="table-footer"><span>Showing {pageProducts.length} of {filtered.length} products</span><div><button disabled={page === 1} onClick={() => setPage(page - 1)}>←</button>{Array.from({ length: totalPages }).slice(0, 5).map((_, index) => <button key={index + 1} className={page === index + 1 ? 'page-active' : ''} onClick={() => setPage(index + 1)}>{index + 1}</button>)}<button disabled={page === totalPages} onClick={() => setPage(page + 1)}>→</button></div></footer>
+              <footer className="table-footer"><span>Affichage de {filtered.length} produits correspondant aux filtres</span></footer>
             </section>}
           </div>
         </section>
