@@ -58,6 +58,9 @@ export default async function handler(req, res) {
       price: proposal.price,
       currency: proposal.currency,
       exchangeRate: proposal.exchangeRate || product.exchangeRate,
+      shippingIncluded: proposal.shippingIncluded,
+      minDeliveryDays: proposal.minDeliveryDays,
+      maxDeliveryDays: proposal.maxDeliveryDays,
       wooVerified: true,
       wooUpdated: woo.updated.length,
     };

@@ -46,3 +46,9 @@ test('invalid price, currency, shipping and ETA are rejected', () => {
   }
   assert.throws(() => validateCjPriceProposal({ ...draft, currency: 'EUR' }));
 });
+
+test('confirmed free freight permits a suggestion, imported zero freight does not', () => {
+  assert.equal(suggestCjPrice({ ...product, shippingUsd: 0, shippingConfirmed: true }, true), 15.39);
+  assert.equal(suggestCjPrice({ ...product, shippingUsd: 0 }, true), null);
+  assert.equal(suggestCjPrice({ ...product, shippingUsd: 0, variantFreight: { method: 'Free', variants: [{ vid: 'a', cjCostUsd: 10, routes: [{ method: 'Free', shippingCost: 0 }] }] } }, true), 15.39);
+});

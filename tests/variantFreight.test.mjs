@@ -30,3 +30,23 @@ test('partial quotes are labelled incomplete; free quotes remain valid', () => {
 test('Woo reimport preserves variant freight', () => {
   assert.deepEqual(mergeCjDataIntoWordPressProduct({}, product).variantFreight, product.variantFreight);
 });
+
+test('delivery estimates cover every quoted size and missing estimates are not invented', async () => {
+  const { freightDeliveryRange } = await import('../lib/variantFreight.mjs');
+  const p = { variantFreight: { method: 'CJ', variants: [
+    { cjCostUsd: 5, routes: [{ method: 'CJ', shippingCost: 7, minDeliveryDays: 12, maxDeliveryDays: 20 }] },
+    { cjCostUsd: 5, routes: [{ method: 'CJ', shippingCost: 5, minDeliveryDays: 14, maxDeliveryDays: 25 }] },
+  ] } };
+  assert.deepEqual(freightDeliveryRange(p), { min: 12, max: 25 });
+  p.variantFreight.variants[1].routes[0].maxDeliveryDays = 0;
+  assert.equal(freightDeliveryRange(p), null);
+});
+test('completed quotes select a method available on every variant', async () => {
+  const { commonFreightMethod } = await import('../lib/variantFreight.mjs');
+  const freight = { method: 'Only S', variants: [
+    { quotedAt: 'now', routes: [{ method: 'Only S', shippingCost: 1 }, { method: 'Common', shippingCost: 7 }, { method: 'Premium', shippingCost: 10 }] },
+    { quotedAt: 'now', routes: [{ method: 'Common', shippingCost: 5 }, { method: 'Premium', shippingCost: 12 }] },
+  ] };
+  assert.equal(commonFreightMethod(freight), 'Common');
+  assert.equal(commonFreightMethod({ ...freight, method: 'Premium' }), 'Premium');
+});

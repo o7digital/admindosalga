@@ -1,3 +1,4 @@
+import { commonFreightMethod } from '@/lib/variantFreight.mjs';
 import { isCjRateLimit, isCjAccessDisabled } from '@/lib/cjRequestQueue.mjs';
 import { databaseIsAvailable, listProducts, saveVariantFreight } from '@/lib/productRepository';
 import { getCjFreightVariants, getLogistics } from '@/services/cjdropshipping';
@@ -28,6 +29,7 @@ export default async function handler(req, res) {
       }
       variant.quotedAt = new Date().toISOString();
       if (!freight.method) freight.method = variant.routes[0]?.method || '';
+      freight.method = commonFreightMethod(freight);
     } else if (req.body.action === 'method') {
       if (!freight?.variants.some(item => item.routes?.some(route => route.method === req.body.method))) return res.status(400).json({ message: 'Méthode inconnue.' });
       freight.method = req.body.method;

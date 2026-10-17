@@ -667,7 +667,15 @@ export default function ProductControl() {
       ...product,
       previousSalePrice: publication.previousPrice,
       salePrice: publication.price,
+      priceRegistry: product.priceRegistry ? { ...product.priceRegistry,
+        finalPrice: publication.price, finalCurrency: publication.currency,
+        exchangeRate: publication.exchangeRate ?? product.exchangeRate,
+        decisionSource: 'admin-woo-publication', verified: true,
+      } : product.priceRegistry,
       wooPricePublication: publication,
+      shippingIncluded: publication.shippingIncluded ?? product.shippingIncluded,
+      minDeliveryDays: publication.minDeliveryDays ?? product.minDeliveryDays,
+      maxDeliveryDays: publication.maxDeliveryDays ?? product.maxDeliveryDays,
     } : product));
     notify('WooCommerce price updated and verified · CJ unchanged');
   };
