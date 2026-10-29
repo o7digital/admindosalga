@@ -148,14 +148,16 @@ Le statut public WooCommerce est vérifié avant toute écriture : un produit br
 masqué ou non achetable y est refusé. Un ancien statut « off shelf » dans CJ ne bloque
 pas la mise à jour, car `saveProduct` sert précisément à réenregistrer la fiche active.
 
-Le bouton **Transport par variante** dans le catalogue récupère les variantes CJ
+Le bouton **Détail FX Shipping COST par sous-produit** dans le catalogue récupère les variantes CJ
 (pointure, couleur, taille ou autre SKU), puis demande séquentiellement un devis
 par variante pour une unité, depuis la Chine vers la destination du produit.
 Les devis sont enregistrés dans Railway (`store_listings.metadata.variantFreight`)
 et restent conservés lors des imports WooCommerce et des modifications de fiche.
-Le détail affiche coût CJ, Shipping COST en USD et **FX Shipping COST** en MXN,
-avec le montant USD et le taux appliqué sur chaque ligne de SKU. Le taux est celui
-de la fiche produit. Les nouveaux devis distinguent le transport CJ (`logisticPrice`)
+La colonne **FX Shipping COST · USD**, placée après la boutique, affiche la
+fourchette des coûts de transport des sous-produits confirmés. Son détail affiche
+le coût CJ et le coût de transport USD propre à chaque SKU et méthode sélectionnée.
+Le taux de change est affiché dans l'encart DOF du catalogue ; il reste utilisé
+pour les conversions et calculs de marge. Les nouveaux devis distinguent le transport CJ (`logisticPrice`)
 du total postal (`totalPostageFee`) : les frais éventuels figurent séparément et
 restent inclus dans les totaux, les marges et les suggestions de prix. Les anciens
 devis sont identifiés comme totaux postaux historiques à actualiser pour séparer
