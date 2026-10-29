@@ -1,5 +1,6 @@
 import { createCjRequestQueue, isCjRateLimit, isCjAccessDisabled } from '../lib/cjRequestQueue.mjs';
 import { applyCjCostUpdate, parseCjPrice } from '../lib/cjData.mjs';
+import { freightShippingTotal } from '../lib/variantFreight.mjs';
 
 const CJ_API_BASE_URL = process.env.CJ_API_BASE_URL || 'https://developers.cjdropshipping.com/api2.0/v1';
 const CJ_REQUEST_TIMEOUT_MS = Number(process.env.CJ_REQUEST_TIMEOUT_MS) || 20000;
@@ -213,11 +214,14 @@ export const getLogistics = async (variant, destination) => {
       origin: 'CJ · China',
       destination: destinationCountryCode(destination) === 'MX' ? 'México' : 'USA',
       method: route.logisticName || 'CJ logistics',
-      shippingCost: Number(route.totalPostageFee ?? route.logisticPrice),
+      shippingCost: Number(route.logisticPrice ?? route.totalPostageFee),
+      totalShippingCost: Number(route.totalPostageFee ?? route.logisticPrice),
+      costBreakdown: route.logisticPrice !== undefined && route.logisticPrice !== null,
       ...parseAging(route.logisticAging),
     }))
-    .filter(route => Number.isFinite(route.shippingCost) && route.shippingCost >= 0)
-    .sort((left, right) => left.shippingCost - right.shippingCost);
+    .filter(route => Number.isFinite(route.shippingCost) && route.shippingCost >= 0
+      && Number.isFinite(route.totalShippingCost) && route.totalShippingCost >= route.shippingCost)
+    .sort((left, right) => left.totalShippingCost - right.totalShippingCost);
 };
 
 export const getCjConnectionStatus = async ({ verify = false } = {}) => {
@@ -309,7 +313,7 @@ export const syncCjProduct = async (product, { includeFreight = false } = {}) =>
   };
 
   if (includeFreight && route.shippingCost !== undefined) {
-    compare('shippingUsd', product.shippingUsd ?? product.shippingCost, route.shippingCost);
+    compare('shippingUsd', product.shippingUsd ?? product.shippingCost, freightShippingTotal(route));
   }
   compare('cjStock', product.cjStock, cjProduct.stock);
 
@@ -318,8 +322,8 @@ export const syncCjProduct = async (product, { includeFreight = false } = {}) =>
     product: {
       ...costUpdate.product,
       ...(includeFreight && route.shippingCost !== undefined ? {
-        shippingCost: route.shippingCost,
-        shippingUsd: route.shippingCost,
+        shippingCost: freightShippingTotal(route),
+        shippingUsd: freightShippingTotal(route),
         shippingCurrency: 'USD',
         shippingConfirmed: true,
         shippingConfirmedAt: new Date().toISOString(),

@@ -1,4 +1,5 @@
 import VariantFreight from '@/components/VariantFreight';
+import { freightShippingTotal } from '@/lib/variantFreight.mjs';
 import { productAudit, compareProductPriority } from '@/lib/productAlerts.mjs';
 import { convertSourcePrice, normalizeWooPrice } from '@/lib/wooPricing.mjs';
 import Head from 'next/head';
@@ -741,8 +742,8 @@ export default function ProductControl() {
       cjCost: result.product.cjCost,
       cjCostUsd: result.product.cjCost,
       cjCostCurrency: result.product.currency,
-      shippingCost: route.shippingCost || 0,
-      shippingUsd: route.shippingCost || 0,
+      shippingCost: freightShippingTotal(route) || 0,
+      shippingUsd: freightShippingTotal(route) || 0,
       shippingCurrency: result.product.currency,
       shippingConfirmed: route.shippingCost !== undefined,
       shippingConfirmedAt: route.shippingCost !== undefined ? new Date().toISOString() : current.shippingConfirmedAt,
@@ -1028,7 +1029,7 @@ export default function ProductControl() {
               </div>
               <div className="table-wrap">
                 <table>
-                  <thead><tr><th className="product-col">Product / brand</th><th>Store</th><th>FX produit USD ↔ MXN</th><th>Railway price</th><th>CJ cost USD</th><th>Shipping produit</th><th>Sale price</th><th>Update WooCommerce price</th><th>Temu</th><th>Amazon</th><th>Route & ETA</th><th>Stock</th><th>Margin</th><th>Editor (Clerk)</th><th>Sync</th><th /></tr></thead>
+                  <thead><tr><th className="product-col">Product / brand</th><th>Store</th><th>FX produit USD ↔ MXN</th><th>Railway price</th><th>CJ cost USD</th><th>Shipping COST / FX par sous-produit</th><th>Sale price</th><th>Update WooCommerce price</th><th>Temu</th><th>Amazon</th><th>Route & ETA</th><th>Stock</th><th>Margin</th><th>Editor (Clerk)</th><th>Sync</th><th /></tr></thead>
                   <tbody>{pageProducts.map((product) => {
                     const margin = calculateProductMargin(product);
                     const percent = Math.round(margin.marginRate * 100);

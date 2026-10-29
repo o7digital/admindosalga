@@ -1,4 +1,4 @@
-import { commonFreightMethod } from '@/lib/variantFreight.mjs';
+import { commonFreightMethod, selectFreightMethod } from '@/lib/variantFreight.mjs';
 import { isCjRateLimit, isCjAccessDisabled } from '@/lib/cjRequestQueue.mjs';
 import { databaseIsAvailable, listProducts, saveVariantFreight } from '@/lib/productRepository';
 import { getCjFreightVariants, getLogistics } from '@/services/cjdropshipping';
@@ -15,6 +15,10 @@ export default async function handler(req, res) {
     if (req.body.action === 'start') {
       const variants = await getCjFreightVariants(product);
       if (!variants.length) throw new Error('CJ ne renvoie aucune variante.');
+      for (const variant of variants) {
+        const previous = freight?.variants?.find(item => item.vid === variant.vid);
+        if (previous?.shippingMethod) variant.shippingMethod = previous.shippingMethod;
+      }
       freight = { variants, method: product.variantFreight?.method || '', origin: 'CN', destination: product.shippingDestination || (product.siteId === 'dosalga-usa' ? 'USA' : 'México'), capturedAt: new Date().toISOString() };
     } else if (req.body.action === 'quote') {
       if (!freight || freight.capturedAt !== req.body.capturedAt) return res.status(409).json({ message: 'Session de devis modifiée. Relancez la synchronisation.' });
@@ -31,8 +35,10 @@ export default async function handler(req, res) {
       if (!freight.method) freight.method = variant.routes[0]?.method || '';
       freight.method = commonFreightMethod(freight);
     } else if (req.body.action === 'method') {
-      if (!freight?.variants.some(item => item.routes?.some(route => route.method === req.body.method))) return res.status(400).json({ message: 'Méthode inconnue.' });
-      freight.method = req.body.method;
+      if (req.body.capturedAt && req.body.capturedAt !== freight?.capturedAt) return res.status(409).json({ message: 'Session de devis modifiée. Relancez la synchronisation.' });
+      if (req.body.vid !== undefined && typeof req.body.vid !== 'string') return res.status(400).json({ message: 'Variante inconnue.' });
+      try { freight = selectFreightMethod(freight, req.body.method, req.body.vid); }
+      catch (error) { return res.status(400).json({ message: error.message }); }
     } else return res.status(400).json({ message: 'Action inconnue.' });
     if (!await saveVariantFreight(product.id, freight)) throw new Error('Enregistrement du devis impossible.');
     res.status(200).json({ freight });

@@ -153,8 +153,17 @@ Le bouton **Transport par variante** dans le catalogue récupère les variantes 
 par variante pour une unité, depuis la Chine vers la destination du produit.
 Les devis sont enregistrés dans Railway (`store_listings.metadata.variantFreight`)
 et restent conservés lors des imports WooCommerce et des modifications de fiche.
-Le détail affiche coût CJ, transport, total, délai et marge estimée par SKU.
-La méthode de livraison peut être choisie parmi les routes retournées par CJ ;
+Le détail affiche coût CJ, Shipping COST en USD et **FX Shipping COST** en MXN,
+avec le montant USD et le taux appliqué sur chaque ligne de SKU. Le taux est celui
+de la fiche produit. Les nouveaux devis distinguent le transport CJ (`logisticPrice`)
+du total postal (`totalPostageFee`) : les frais éventuels figurent séparément et
+restent inclus dans les totaux, les marges et les suggestions de prix. Les anciens
+devis sont identifiés comme totaux postaux historiques à actualiser pour séparer
+les frais. La destination est affichée dans le catalogue et dans le détail ; une
+comparaison avec CJ nécessite le même pays, SKU et mode de livraison.
+La méthode de livraison peut être choisie par SKU parmi les routes retournées par CJ.
+Le choix par défaut réapplique une méthode à toutes les variantes et efface les
+choix individuels. Un choix individuel est conservé lors d'une actualisation ;
 une variante sans devis pour cette méthode reste non confirmée. La fourchette
 et la marge minimale utilisent uniquement les variantes confirmées et sont
 signalées comme provisoires si la couverture est incomplète. Dans ce cas, la

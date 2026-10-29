@@ -29,3 +29,32 @@ test('CJ variant loading recovers from a QPS error delivered with HTTP 200', asy
     assert.equal(deniedCalls, 1, 'a disabled account must not trigger alternate SKU requests');
   } finally { global.fetch = original; }
 });
+
+test('CJ Shipping Cost uses logisticPrice and retains total postage separately for every SKU and destination', async () => {
+  process.env.CJ_ACCESS_TOKEN = 'test-token';
+  delete process.env.DATABASE_URL;
+  const { getLogistics } = await import('../services/cjdropshipping.js');
+  const original = global.fetch;
+  const calls = [];
+  global.fetch = async (url, options) => {
+    calls.push(JSON.parse(options.body));
+    return { ok: true, status: 200, json: async () => ({ result: true, data: [
+      { logisticName: 'LuWei Ordinary US', logisticPrice: 7.22, totalPostageFee: 8.22, logisticAging: '5-11' },
+      { logisticName: 'Free', logisticPrice: 0, totalPostageFee: 0, logisticAging: '7-14' },
+      { logisticName: 'Unavailable' },
+    ] }) };
+  };
+  try {
+    const routes = await getLogistics({ vid: 'SKU-L' }, 'USA');
+    assert.deepEqual(calls[0], { startCountryCode: 'CN', endCountryCode: 'US', products: [{ quantity: 1, vid: 'SKU-L' }] });
+    assert.equal(routes.length, 2);
+    assert.equal(routes[1].shippingCost, 7.22);
+    assert.equal(routes[1].totalShippingCost, 8.22);
+    assert.equal(routes[1].costBreakdown, true);
+    assert.equal(routes[1].destination, 'USA');
+    assert.equal(routes[0].shippingCost, 0);
+    await getLogistics({ vid: 'SKU-M' }, 'México');
+    assert.equal(calls[1].endCountryCode, 'MX');
+    assert.equal(calls[1].products[0].vid, 'SKU-M');
+  } finally { global.fetch = original; }
+});
