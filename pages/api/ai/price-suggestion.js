@@ -1,3 +1,4 @@
+import { withAuth } from '@/lib/adminAuth';
 import { pricingFallback, parseAiPrice } from '@/lib/priceSuggestion.mjs';
 import { databaseIsAvailable, listProducts } from '@/lib/productRepository';
 import { suggestCjPrice } from '@/lib/cjPricing.mjs';
@@ -5,7 +6,7 @@ import { getLatestOfficialRate } from '@/lib/officialExchangeRate.mjs';
 
 export const config = { maxDuration: 60 };
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   if (req.method !== 'POST') return res.status(405).json({ message: 'Method not allowed' });
   try {
@@ -44,3 +45,5 @@ export default async function handler(req, res) {
     return res.status(502).json({ message: error.message || 'Suggestion IA indisponible.' });
   }
 }
+
+export default withAuth(handler);

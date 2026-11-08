@@ -1,3 +1,4 @@
+import { withAuth } from '@/lib/adminAuth';
 import { databaseIsAvailable, listProducts } from '@/lib/productRepository';
 import { listWooOrders } from '@/services/woocommerce';
 
@@ -58,7 +59,7 @@ const mapOrder = (order, market, products) => {
   };
 };
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ message: 'Method not allowed' });
   try {
     const products = databaseIsAvailable() ? await listProducts() : [];
@@ -80,3 +81,5 @@ export default async function handler(req, res) {
     return res.status(502).json({ message: error.message || 'WooCommerce orders could not be loaded.' });
   }
 }
+
+export default withAuth(handler);

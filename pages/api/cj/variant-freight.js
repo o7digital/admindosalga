@@ -1,3 +1,4 @@
+import { withAuth } from '@/lib/adminAuth';
 import { commonFreightMethod, selectFreightMethod } from '@/lib/variantFreight.mjs';
 import { isCjRateLimit, isCjAccessDisabled } from '@/lib/cjRequestQueue.mjs';
 import { databaseIsAvailable, listProducts, saveVariantFreight } from '@/lib/productRepository';
@@ -5,7 +6,7 @@ import { getCjFreightVariants, getLogistics } from '@/services/cjdropshipping';
 
 export const config = { maxDuration: 60 };
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ message: 'Method not allowed' });
   if (!databaseIsAvailable()) return res.status(503).json({ message: 'PostgreSQL requis pour enregistrer les devis.' });
   try {
@@ -55,3 +56,5 @@ export default async function handler(req, res) {
     return res.status(502).json({ message: error.message || 'Devis CJ indisponible.' });
   }
 }
+
+export default withAuth(handler);

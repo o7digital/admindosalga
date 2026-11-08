@@ -1,6 +1,7 @@
+import { withAuth } from '@/lib/adminAuth';
 import { listPricingRules, upsertPricingRule } from '@/lib/pricingRules';
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   try {
     if (req.method === 'GET') {
       return res.status(200).json({ rules: await listPricingRules() });
@@ -15,3 +16,5 @@ export default async function handler(req, res) {
     return res.status(error.message?.includes('DATABASE_URL') ? 503 : 400).json({ message: error.message || 'Pricing rule operation failed.' });
   }
 }
+
+export default withAuth(handler);

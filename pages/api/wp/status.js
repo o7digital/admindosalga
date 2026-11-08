@@ -1,7 +1,8 @@
+import { withAuth } from '@/lib/adminAuth';
 import { databaseIsAvailable } from '@/lib/productRepository';
 import { getWordPressSyncStatus } from '@/lib/wordpressSyncRepository';
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   if (req.method !== 'GET') return res.status(405).json({ message: 'Method not allowed' });
   if (!databaseIsAvailable()) {
@@ -14,3 +15,5 @@ export default async function handler(req, res) {
     return res.status(500).json({ database: 'error', message: error.message });
   }
 }
+
+export default withAuth(handler);

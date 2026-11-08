@@ -1,3 +1,4 @@
+import { withAuth } from '@/lib/adminAuth';
 import { importWordPressStores } from '@/services/wordpressStores';
 import { databaseIsAvailable, listProducts, upsertProducts } from '@/lib/productRepository';
 import { mergeCjDataIntoWordPressProduct } from '@/lib/cjData.mjs';
@@ -6,7 +7,7 @@ import { failWordPressSync, finishWordPressSync, startWordPressSync } from '@/li
 
 const listingKey = (product) => `${product.siteId || ''}:${String(product.sku || '').trim().toLowerCase()}`;
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' });
   }
@@ -44,3 +45,5 @@ export default async function handler(req, res) {
     return res.status(500).json({ message: error.message || 'WordPress import failed' });
   }
 }
+
+export default withAuth(handler);

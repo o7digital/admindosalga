@@ -1,10 +1,11 @@
+import { withAuth } from '@/lib/adminAuth';
 import { databaseIsAvailable, listProducts, saveWooFreezeState } from '@/lib/productRepository';
 import { listingIdentity } from '@/lib/cjPublication.mjs';
 import { freezeWooProduct, hasWooWriteCredentials } from '@/services/woocommerce';
 
 export const config = { maxDuration: 30 };
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
     return res.status(405).json({ message: 'Method not allowed' });
@@ -39,3 +40,5 @@ export default async function handler(req, res) {
     return res.status(502).json({ message: error.message || 'The product could not be blocked in WooCommerce.' });
   }
 }
+
+export default withAuth(handler);

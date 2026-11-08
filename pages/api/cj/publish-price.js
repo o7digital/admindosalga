@@ -1,3 +1,4 @@
+import { withAuth } from '@/lib/adminAuth';
 import { databaseIsAvailable, listProducts, beginCjPublication, finishCjPublication, stageRailwayPricePublication } from '@/lib/productRepository';
 import { getCjShops, getCjShopProduct, saveCjShopProduct, saveCjShopVariants } from '@/services/cjdropshipping';
 import { hasWooWriteCredentials, publishWooPrice } from '@/services/woocommerce';
@@ -12,7 +13,7 @@ async function wooProduct(identity) {
   return response.json();
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (!['POST', 'GET'].includes(req.method)) return res.status(405).json({ message: 'Method not allowed' });
   if (!databaseIsAvailable()) return res.status(503).json({ message: 'Database required.' });
   let operation;
@@ -85,3 +86,5 @@ export default async function handler(req, res) {
     return res.status(502).json({ message: error.message || 'Publication failed. Verify CJ before retrying.' });
   }
 }
+
+export default withAuth(handler);

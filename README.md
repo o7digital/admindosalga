@@ -9,6 +9,37 @@ npm install
 npm run dev
 ```
 
+## Accès administrateur
+
+L’admin utilise des comptes email/mot de passe dans PostgreSQL. Aucune inscription
+publique ni clé Clerk n’est nécessaire. Le tableau de bord et chaque API vérifient
+la session côté serveur ; sans base disponible, l’accès est refusé. Les réponses
+authentifiées ne sont jamais mises en cache dans le CDN.
+
+Après `npm run db:migrate`, créer les deux comptes autorisés avec :
+
+```bash
+node scripts/provision-admins.mjs
+```
+
+Le script crée `dosalga.fac@gmail.com` et `olivier.steineur@gmail.com`, conserve les
+comptes existants et affiche une seule fois les mots de passe aléatoires. Ils expirent
+après sept jours et doivent être remplacés à la première connexion sur `/sign-in`.
+Les mots de passe sont hachés avec scrypt ; seuls les condensats des jetons de session
+sont enregistrés en base. Le cookie est HttpOnly, SameSite=Lax et Secure en déploiement.
+Les sessions durent 12 heures. Le changement de mot de passe révoque toutes les
+anciennes sessions ; la déconnexion révoque la session courante.
+
+La connexion est limitée à huit tentatives par email et quarante par IP en quinze
+minutes. Les écritures exigent une origine identique. Les mots de passe personnels
+doivent contenir 12 à 128 caractères et peuvent être changés depuis le profil.
+En cas de mot de passe oublié ou temporaire expiré, un opérateur disposant de l’accès
+à la base peut exécuter `node scripts/provision-admins.mjs --reset` pour régénérer
+les deux accès après confirmation. Aucun email automatique n’est envoyé.
+
+Charger `DATABASE_URL` et, pour les scripts, `DATABASE_URL_NON_POOLING` dans
+l’environnement. Vérification : `node --test tests/*.test.mjs`.
+
 ## Connexions
 
 L'admin importe les catalogues depuis les deux backends WooCommerce:

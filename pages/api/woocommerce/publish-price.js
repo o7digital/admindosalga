@@ -1,10 +1,11 @@
+import { withAuth } from '@/lib/adminAuth';
 import { databaseIsAvailable, listProducts, beginWooPricePublication, finishWooPricePublication, stageRailwayPricePublication } from '@/lib/productRepository';
 import { listingIdentity } from '@/lib/cjPublication.mjs';
 import { hasWooWriteCredentials, publishWooPrice, reviewWooPrice } from '@/services/woocommerce';
 
 export const config = { maxDuration: 60 };
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (!['GET', 'POST'].includes(req.method)) return res.status(405).json({ message: 'Method not allowed' });
   if (!databaseIsAvailable()) return res.status(503).json({ message: 'PostgreSQL is required.' });
 
@@ -75,3 +76,5 @@ export default async function handler(req, res) {
     return res.status(502).json({ message: error.message || 'WooCommerce price publication failed.' });
   }
 }
+
+export default withAuth(handler);

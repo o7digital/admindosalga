@@ -1,3 +1,4 @@
+import { withAuth } from '@/lib/adminAuth';
 import { getLatestOfficialRate } from '@/lib/officialExchangeRate.mjs';
 import { databaseIsAvailable, listProducts, upsertProducts } from '@/lib/productRepository';
 import { convertSourcePrice } from '@/lib/wooPricing.mjs';
@@ -5,7 +6,7 @@ import { convertSourcePrice } from '@/lib/wooPricing.mjs';
 export const config = { maxDuration: 60 };
 
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   try {
     if (req.method === 'GET') return res.status(200).json(await getLatestOfficialRate());
@@ -26,3 +27,5 @@ export default async function handler(req, res) {
     return res.status(502).json({ message: error.message || 'FX update failed.' });
   }
 }
+
+export default withAuth(handler);

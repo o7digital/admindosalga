@@ -1,3 +1,4 @@
+import { withAuth } from '@/lib/adminAuth';
 import { syncCjProductCost } from '@/services/cjdropshipping';
 import { databaseIsAvailable, listProducts, upsertProducts } from '@/lib/productRepository';
 
@@ -10,7 +11,7 @@ const requestId = (product) => String(
   typeof product === 'string' ? product : product?.id || '',
 ).trim();
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' });
   }
@@ -79,3 +80,5 @@ export default async function handler(req, res) {
     products,
   });
 }
+
+export default withAuth(handler);

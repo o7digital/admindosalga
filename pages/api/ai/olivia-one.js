@@ -1,3 +1,4 @@
+import { withAuth } from '@/lib/adminAuth';
 import { databaseIsAvailable, listProducts } from '@/lib/productRepository';
 import { normalizeWooPrice } from '@/lib/wooPricing.mjs';
 import { auditCatalogue } from '@/lib/productAlerts.mjs';
@@ -143,7 +144,7 @@ const callHuggingFace = async (summary) => {
   return parsed;
 };
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' });
   }
@@ -182,3 +183,5 @@ export default async function handler(req, res) {
     return res.status(500).json({ message: error.message || 'Olivia One analysis failed' });
   }
 }
+
+export default withAuth(handler);

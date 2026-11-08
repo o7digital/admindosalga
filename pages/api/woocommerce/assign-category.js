@@ -1,8 +1,9 @@
+import { withAuth } from '@/lib/adminAuth';
 import { databaseIsAvailable, listProducts } from '@/lib/productRepository';
 import { listingIdentity } from '@/lib/cjPublication.mjs';
 import { assignWooCategory } from '@/services/woocommerce';
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ message: 'Method not allowed' });
   if (!databaseIsAvailable()) return res.status(503).json({ message: 'PostgreSQL is required.' });
   try {
@@ -14,3 +15,5 @@ export default async function handler(req, res) {
     return res.status(502).json({ message: error.message || 'WooCommerce category update failed.' });
   }
 }
+
+export default withAuth(handler);

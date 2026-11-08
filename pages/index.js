@@ -5,7 +5,7 @@ import { convertSourcePrice, normalizeWooPrice } from '@/lib/wooPricing.mjs';
 import Head from 'next/head';
 import CjPriceCell from '@/components/CjPriceCell';
 import { useEffect, useMemo, useState } from 'react';
-import { UserButton } from '@clerk/nextjs';
+import AccountMenu from '@/components/AccountMenu';
 import { calculateProductMargin, formatCurrency, formatPercent } from '@/lib/margins';
 
 const logoUrl = 'https://www.dosalga.store/logo-dosalga.png';
@@ -265,7 +265,7 @@ function SociosDashboard({ market, notify }) {
   );
 }
 
-export default function ProductControl() {
+export default function ProductControl({ user }) {
   const [products, setProducts] = useState([]);
   const [orders, setOrders] = useState([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
@@ -300,8 +300,7 @@ export default function ProductControl() {
     storeCode: 'MX', categorySlug: 'caps', sourceCurrency: 'MXN', displayCurrency: 'MXN',
     priceMode: 'native', exchangeRate: 1, active: true, notes: '',
   });
-  const clerkEnabled = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
-  const editorName = () => window.Clerk?.user?.fullName || window.Clerk?.user?.primaryEmailAddress?.emailAddress || 'System';
+  const editorName = () => user.email;
 
   const persistProducts = (nextProducts) => {
     try {
@@ -908,7 +907,7 @@ export default function ProductControl() {
             ))}
           </nav>
           <div className="sidebar-note"><div className="note-top"><span>CJ connection</span><span className={cjConnection.connected ? 'online' : ''}>● {cjStatusLabel}</span></div><strong>2 stores connected</strong><p>MX + USA backends</p></div>
-          <div className="profile">{clerkEnabled ? <UserButton afterSignOutUrl="/sign-in" /> : <div className="avatar">OS</div>}<div><strong>Dosalga Admin</strong><span>{clerkEnabled ? 'Compte sécurisé' : 'Clerk à configurer'}</span></div></div>
+          <AccountMenu user={user} />
         </aside>
 
         <section className="workspace">
@@ -1029,7 +1028,7 @@ export default function ProductControl() {
               </div>
               <div className="table-wrap">
                 <table>
-                  <thead><tr><th className="product-col">Product / brand</th><th>Store</th><th>FX Shipping COST · USD</th><th>Railway price</th><th>CJ cost USD</th><th>Sale price</th><th>Update WooCommerce price</th><th>Temu</th><th>Amazon</th><th>Route & ETA</th><th>Stock</th><th>Margin</th><th>Editor (Clerk)</th><th>Sync</th><th /></tr></thead>
+                  <thead><tr><th className="product-col">Product / brand</th><th>Store</th><th>FX Shipping COST · USD</th><th>Railway price</th><th>CJ cost USD</th><th>Sale price</th><th>Update WooCommerce price</th><th>Temu</th><th>Amazon</th><th>Route & ETA</th><th>Stock</th><th>Margin</th><th>Editor</th><th>Sync</th><th /></tr></thead>
                   <tbody>{pageProducts.map((product) => {
                     const margin = calculateProductMargin(product);
                     const percent = Math.round(margin.marginRate * 100);
@@ -1129,4 +1128,17 @@ export default function ProductControl() {
       </main>
     </>
   );
+}
+
+export async function getServerSideProps({ req, res }) {
+  res.setHeader('Cache-Control', 'private, no-store');
+  const { getSession, publicUser } = await import('@/lib/adminAuth');
+  try {
+    const user = await getSession(req);
+    if (!user) return { redirect: { destination: '/sign-in', permanent: false } };
+    if (user.must_change_password) return { redirect: { destination: '/change-password', permanent: false } };
+    return { props: { user: publicUser(user) } };
+  } catch {
+    return { redirect: { destination: '/sign-in?unavailable=1', permanent: false } };
+  }
 }

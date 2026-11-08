@@ -1,8 +1,9 @@
+import { withAuth } from '@/lib/adminAuth';
 import { getLatestOfficialRate } from '@/lib/officialExchangeRate.mjs';
 import { databaseIsAvailable, saveCjPriceProposal } from '@/lib/productRepository';
 import { validateCjPriceProposal } from '@/lib/cjPricing.mjs';
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== 'PUT') {
     res.setHeader('Allow', 'PUT');
     return res.status(405).json({ message: 'Method not allowed' });
@@ -28,3 +29,5 @@ export default async function handler(req, res) {
     return res.status(500).json({ message: 'Price proposal could not be saved. Please retry.' });
   }
 }
+
+export default withAuth(handler);

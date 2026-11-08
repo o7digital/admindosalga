@@ -1,3 +1,4 @@
+import { withAuth } from '@/lib/adminAuth';
 import { syncCjProduct } from '@/services/cjdropshipping';
 import { databaseIsAvailable, upsertProducts } from '@/lib/productRepository';
 
@@ -6,7 +7,7 @@ const CJ_REQUEST_INTERVAL_MS = 1100;
 
 const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' });
   }
@@ -63,3 +64,5 @@ export default async function handler(req, res) {
     products,
   });
 }
+
+export default withAuth(handler);

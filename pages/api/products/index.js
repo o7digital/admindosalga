@@ -1,3 +1,4 @@
+import { withAuth } from '@/lib/adminAuth';
 import { getLatestOfficialRate } from '@/lib/officialExchangeRate.mjs';
 import { normalizeWooPrice } from '@/lib/wooPricing.mjs';
 import fs from 'fs/promises';
@@ -72,7 +73,7 @@ const buildProduct = (payload) => {
   };
 };
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   try {
     if (req.method === 'GET') {
       res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
@@ -142,3 +143,5 @@ export default async function handler(req, res) {
     return res.status(500).json({ message: error.message || 'Product operation failed' });
   }
 }
+
+export default withAuth(handler);

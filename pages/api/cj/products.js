@@ -1,6 +1,7 @@
+import { withAuth } from '@/lib/adminAuth';
 import { importCjProduct, searchCjProducts } from '@/services/cjdropshipping';
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' });
   }
@@ -16,3 +17,5 @@ export default async function handler(req, res) {
     return res.status(500).json({ message: error.message || 'CJ import failed' });
   }
 }
+
+export default withAuth(handler);

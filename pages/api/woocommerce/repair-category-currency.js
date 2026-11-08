@@ -1,8 +1,9 @@
+import { withAuth } from '@/lib/adminAuth';
 import { hasWooWriteCredentials, repairWooCategoryCurrency } from '@/services/woocommerce';
 
 export const config = { maxDuration: 300 };
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ message: 'Method not allowed' });
   const market = String(req.body?.market || 'MX').toUpperCase();
   const categorySlug = String(req.body?.categorySlug || 'caps').trim().toLowerCase();
@@ -23,3 +24,5 @@ export default async function handler(req, res) {
     return res.status(502).json({ message: error.message || 'WooCommerce category currency repair failed.' });
   }
 }
+
+export default withAuth(handler);

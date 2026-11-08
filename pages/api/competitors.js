@@ -1,6 +1,7 @@
+import { withAuth } from '@/lib/adminAuth';
 import { databaseIsAvailable, saveCompetitorOffer } from '@/lib/productRepository';
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ message: 'Method not allowed' });
   if (!databaseIsAvailable()) return res.status(503).json({ message: 'PostgreSQL is required to save competitor prices.' });
 
@@ -32,3 +33,5 @@ export default async function handler(req, res) {
     return res.status(500).json({ message: error.message || 'Competitor price could not be saved.' });
   }
 }
+
+export default withAuth(handler);
