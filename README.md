@@ -222,3 +222,21 @@ y compris les week-ends et jours fériés. Les taux enregistrés sur les produit
 restent distincts. Une panne du DOF est signalée ; aucun taux d'une autre source
 n'est présenté comme officiel. Les devises et prix des produits ne sont pas
 modifiés automatiquement par l'actualisation de cet affichage.
+
+### Préparation du catalogue US depuis les produits verts MX
+
+Après `npm run db:migrate`, `npm run catalog:import-us` produit un aperçu sans
+écriture. `npm run catalog:import-us -- --apply --backup=<fichier-prive.json>`
+importe les références dont la dernière proposition de prix a été vérifiée dans
+WooCommerce. Le fichier de sauvegarde est obligatoire et créé avec des droits
+restreints ; il doit rester hors Git.
+
+Les SKU US existants sont conservés. Les nouvelles fiches US réutilisent l'identité
+produit/CJ, mais restent à vérifier, sans identifiant WooCommerce US, sans prix USD
+ni livraison validée. Les descriptions, photos, variantes et décisions MX restent
+consultables dans `storefront_catalog_imports`, séparément des décisions US.
+Un produit bloqué au MX conserve ce signalement dans son import.
+
+Le catalogue public US utilise uniquement les instantanés publiés avec
+`store_id = 'US'`. Les imports en attente n'entrent pas dans ces instantanés.
+Relancer la commande ne crée pas de doublons et n'écrase pas la préparation US.

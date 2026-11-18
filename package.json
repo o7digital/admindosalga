@@ -9,7 +9,8 @@
     "test": "node --test tests/*.test.mjs",
     "test:auth": "node tests/auth.integration.mjs",
     "db:migrate": "node scripts/migrate.js",
-    "db:verify": "node scripts/verify-database.js"
+    "db:verify": "node scripts/verify-database.js",
+    "catalog:import-us": "node scripts/import-mx-to-us.mjs"
   },
   "dependencies": {
     "@clerk/localizations": "^3.37.11",
