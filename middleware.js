@@ -1,17 +1,25 @@
+import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
+import { isClerkConfigured } from './lib/auth.mjs';
 
-// Early navigation guard only. The dashboard and every API independently verify
-// sessions against PostgreSQL, even if middleware is bypassed.
-export default function middleware(request) {
-  const { pathname } = request.nextUrl;
-  if (pathname === '/sign-in' || pathname.startsWith('/sign-in/') || pathname.startsWith('/api/auth/')) return NextResponse.next();
-  if (!/^[a-f0-9]{64}$/.test(request.cookies.get('dosalga_admin_session')?.value || '')) {
-    if (pathname.startsWith('/api/')) return NextResponse.json({ message: 'Veuillez vous connecter.' }, { status: 401, headers: { 'Cache-Control': 'private, no-store' } });
-    const url = new URL('/sign-in', request.url);
-    url.searchParams.set('next', `${pathname}${request.nextUrl.search}`);
-    return NextResponse.redirect(url);
-  }
-  return NextResponse.next();
+const isPublicRoute = createRouteMatcher(['/sign-in(.*)', '/sign-up(.*)']);
+const unauthorized = (status, message) => NextResponse.json({ message }, { status, headers: { 'Cache-Control': 'private, no-store' } });
+
+const clerk = clerkMiddleware(async (auth, request) => {
+  if (isPublicRoute(request)) return NextResponse.next();
+  const { userId } = await auth();
+  if (userId) return NextResponse.next();
+  if (request.nextUrl.pathname.startsWith('/api/')) return unauthorized(401, 'Veuillez vous connecter.');
+  const url = new URL('/sign-in', request.url);
+  url.searchParams.set('next', `${request.nextUrl.pathname}${request.nextUrl.search}`);
+  return NextResponse.redirect(url);
+}, { signInUrl: '/sign-in', signUpUrl: '/sign-up' });
+
+export default function middleware(request, event) {
+  if (isClerkConfigured()) return clerk(request, event);
+  if (isPublicRoute(request)) return NextResponse.next();
+  if (request.nextUrl.pathname.startsWith('/api/')) return unauthorized(503, 'Connexion temporairement indisponible.');
+  return NextResponse.redirect(new URL('/sign-in?unavailable=1', request.url));
 }
 
 export const config = {

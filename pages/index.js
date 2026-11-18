@@ -1130,15 +1130,7 @@ export default function ProductControl({ user }) {
   );
 }
 
-export async function getServerSideProps({ req, res }) {
-  res.setHeader('Cache-Control', 'private, no-store');
-  const { getSession, publicUser } = await import('@/lib/adminAuth');
-  try {
-    const user = await getSession(req);
-    if (!user) return { redirect: { destination: '/sign-in', permanent: false } };
-    if (user.must_change_password) return { redirect: { destination: '/change-password', permanent: false } };
-    return { props: { user: publicUser(user) } };
-  } catch {
-    return { redirect: { destination: '/sign-in?unavailable=1', permanent: false } };
-  }
+export async function getServerSideProps(context) {
+  const { authenticatedPage } = await import('@/lib/adminAuth');
+  return authenticatedPage(context);
 }

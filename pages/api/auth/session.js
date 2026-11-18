@@ -6,4 +6,4 @@ export default withAuth(async function handler(req, res) {
     return res.status(405).json({ message: 'Méthode non autorisée.' });
   }
   return res.status(200).json({ user: publicUser(req.authUser) });
-}, { allowPasswordChange: true });
+});

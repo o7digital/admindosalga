@@ -11,34 +11,43 @@ npm run dev
 
 ## Accès administrateur
 
-L’admin utilise des comptes email/mot de passe dans PostgreSQL. Aucune inscription
-publique ni clé Clerk n’est nécessaire. Le tableau de bord et chaque API vérifient
-la session côté serveur ; sans base disponible, l’accès est refusé. Les réponses
-authentifiées ne sont jamais mises en cache dans le CDN.
+Clerk gère la création du compte sur `/sign-up`, la connexion sur `/sign-in`,
+la vérification de l’email, la récupération du mot de passe et le profil sur `/account`.
+Le lien « Créer un compte » est disponible sur la page de connexion. Aucun mot de passe
+temporaire ni provisionnement PostgreSQL n’est nécessaire.
 
-Après `npm run db:migrate`, créer les deux comptes autorisés avec :
+Configuration :
 
-```bash
-node scripts/provision-admins.mjs
-```
+1. Dans l’application Clerk dédiée à Admin Dosalga, activer l’inscription par email
+   avec vérification de l’adresse. Pour limiter aussi les inscriptions dans Clerk,
+   utiliser sa liste d’autorisation pour `dosalga.fac@gmail.com` et
+   `olivier.steineur@gmail.com`.
+2. Copier `.env.example` vers `.env.local` et renseigner
+   `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` et `CLERK_SECRET_KEY`, issues de la même instance.
+3. Ajouter ces deux variables dans Vercel pour Preview (branche `dev`). Pour la
+   production, configurer les clés de l’instance Clerk de production et ses domaines
+   selon le guide de déploiement Clerk, puis redéployer : la clé publique est intégrée
+   au bundle lors du build.
 
-Le script crée `dosalga.fac@gmail.com` et `olivier.steineur@gmail.com`, conserve les
-comptes existants et affiche une seule fois les mots de passe aléatoires. Ils expirent
-après sept jours et doivent être remplacés à la première connexion sur `/sign-in`.
-Les mots de passe sont hachés avec scrypt ; seuls les condensats des jetons de session
-sont enregistrés en base. Le cookie est HttpOnly, SameSite=Lax et Secure en déploiement.
-Les sessions durent 12 heures. Le changement de mot de passe révoque toutes les
-anciennes sessions ; la déconnexion révoque la session courante.
+Le middleware vérifie la session Clerk ; le tableau de bord et chaque API contrôlent
+également la session et le compte côté serveur. Seule une adresse principale vérifiée
+correspondant à l’un des deux administrateurs ci-dessus ouvre l’accès au catalogue.
+Les autres comptes voient `/access-denied`. Les écritures exigent une origine identique
+et les réponses authentifiées ne sont jamais mises en cache dans le CDN.
+Sans clés Clerk, les formulaires affichent une indisponibilité et les API refusent
+l’accès (503). Les anciens cookies et endpoints de connexion PostgreSQL sont retirés ;
+les anciennes tables restent en base pour conserver l’historique des migrations.
 
-La connexion est limitée à huit tentatives par email et quarante par IP en quinze
-minutes. Les écritures exigent une origine identique. Les mots de passe personnels
-doivent contenir 12 à 128 caractères et peuvent être changés depuis le profil.
-En cas de mot de passe oublié ou temporaire expiré, un opérateur disposant de l’accès
-à la base peut exécuter `node scripts/provision-admins.mjs --reset` pour régénérer
-les deux accès après confirmation. Aucun email automatique n’est envoyé.
+`DATABASE_URL` et `DATABASE_URL_NON_POOLING` restent nécessaires au catalogue et aux
+scripts de base de données. Vérifications : `npm test`, `npm run build`, puis
+`AUTH_TEST_BASE_URL=http://localhost:3000 npm run test:auth` contre l’application lancée.
+Le test HTTP contrôle aussi le refus des anciens cookies et des tentatives de contournement
+du middleware. Ajouter `AUTH_TEST_CLERK_CONFIGURED=1` si les clés sont configurées.
+Les variables facultatives `AUTH_TEST_SESSION_COOKIE` et `AUTH_TEST_DENIED_SESSION_COOKIE`
+permettent de vérifier des sessions Clerk réelles, respectivement autorisée et refusée.
 
-Charger `DATABASE_URL` et, pour les scripts, `DATABASE_URL_NON_POOLING` dans
-l’environnement. Vérification : `node --test tests/*.test.mjs`.
+Références : [Pages Router et sessions Clerk](https://clerk.com/docs/reference/nextjs/pages-router/get-auth),
+[déploiement Clerk en production](https://clerk.com/docs/guides/development/deployment/production).
 
 ## Connexions
 
