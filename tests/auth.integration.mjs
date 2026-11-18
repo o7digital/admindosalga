@@ -18,11 +18,12 @@ for (const path of ['/', '/account', '/account/security', '/access-denied']) {
   assert.ok([302, 307].includes(result.status), `${path}: anonymous visitors must be redirected`);
   assert.match(result.headers.get('location'), /sign-in/);
 }
-for (const path of ['/sign-in', '/sign-up', '/sign-up/verify-email-address']) {
+for (const path of ['/sign-in', '/sign-in?unavailable=1', '/sign-up', '/sign-up?unavailable=1', '/sign-up/verify-email-address']) {
   const result = await request(path);
   assert.equal(result.status, configured ? 200 : 503, path);
   const html = await result.text();
   assert.ok(html.includes('Dosalga'));
+  if (configured) assert.ok(html.includes('class="clerk-auth"'), `${path}: the Clerk form must remain available after recovery`);
   assert.match(result.headers.get('cache-control'), /private, no-store/);
 }
 for (const path of ['/api/products', '/api/auth/session', '/api/health']) {
@@ -55,8 +56,10 @@ if (process.env.AUTH_TEST_SESSION_COOKIE) {
 if (process.env.AUTH_TEST_DENIED_SESSION_COOKIE) {
   const cookie = process.env.AUTH_TEST_DENIED_SESSION_COOKIE;
   assert.equal((await request('/api/auth/session', { cookie })).status, 403);
-  const result = await request('/', { cookie });
-  assert.match(result.headers.get('location'), /access-denied/);
+  for (const path of ['/', '/sign-in?unavailable=1', '/sign-up?unavailable=1']) {
+    const result = await request(path, { cookie });
+    assert.match(result.headers.get('location'), /access-denied/);
+  }
   console.log('Unauthorized Clerk account checks passed.');
 } else {
   console.log('SKIP: unauthorized Clerk account checks (AUTH_TEST_DENIED_SESSION_COOKIE missing).');
