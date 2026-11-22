@@ -34,6 +34,10 @@ for (const path of ['/api/products', '/api/auth/session', '/api/health']) {
   const bypass = await request(path, { headers: { 'x-middleware-subrequest': 'middleware:middleware:middleware:middleware:middleware' } });
   assert.ok([401, 403, 503].includes(bypass.status), 'middleware bypass must not expose data');
 }
+{
+  const result = await request('/api/wp/intake', { method: 'POST', headers: { Origin: base } });
+  assert.equal(result.status, anonymousStatus, 'automatic catalogue intake requires an authenticated admin');
+}
 for (const path of ['/api/auth/login', '/api/auth/password', '/api/auth/logout']) {
   const result = await request(path, { method: 'POST', headers: { Origin: base, 'Content-Type': 'application/json' }, body: JSON.stringify({ email: 'olivier.steineur@gmail.com', password: 'obsolete-password' }) });
   assert.ok([401, 403, 404, 503].includes(result.status), 'legacy login endpoints must not create sessions');

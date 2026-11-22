@@ -16,6 +16,10 @@ la vérification de l’email, la récupération du mot de passe et le profil su
 Le lien « Créer un compte » est disponible sur la page de connexion. Aucun mot de passe
 temporaire ni provisionnement PostgreSQL n’est nécessaire.
 
+Une adresse autorisée n’est pas automatiquement un compte Clerk : lors de la première
+visite, créer le compte et vérifier l’email. Un compte sans mot de passe utilise le code
+email proposé par Clerk. Un compte réservé mais non vérifié ne donne pas accès à l’admin.
+
 Configuration :
 
 1. Dans l’application Clerk dédiée à Admin Dosalga, activer l’inscription par email
@@ -63,6 +67,26 @@ n'est envoyé au navigateur. `CJ_ACCESS_TOKEN` peut aussi être utilisé tempora
 La synchronisation de coût CJ fonctionne par lots de quatre produits. Elle met à jour le
 coût CJ et conserve séparément le stock CJ, sans écraser le stock de vente WooCommerce.
 L'import d'un produit individuel peut également récupérer les routes et coûts de livraison.
+
+### Arrivée des nouveaux produits MX
+
+Le circuit est **CJ → WooCommerce MX → snapshot Railway → file de contrôle admin →
+publication du prix vérifiée → Dosalga.online**. Aucun email n’est lu par l’admin et un
+produit ajouté uniquement dans CJ doit d’abord être listé dans WooCommerce MX.
+
+`POST /api/wp/intake`, réservé aux administrateurs, ajoute les fiches publiées présentes
+dans `storefront_catalog_products` mais absentes de l’admin. Le dashboard l’appelle à
+l’ouverture et lors de son actualisation toutes les 30 secondes pendant qu’il est visible.
+L’alimentation du snapshot dépend du webhook/sync WooCommerce du storefront. L’import
+WordPress manuel reste disponible. L’arrivée automatique crée des fiches à contrôler,
+sans supposer les conditions de livraison, ni approuver leur prix. Elle préserve les
+fiches existantes, y compris celles bloquées ou archivées ; un verrou transactionnel et
+une seconde vérification d’identité empêchent deux actualisations d’écraser les décisions.
+
+Le statut local « Active » seul ne publie pas un produit. Le storefront MX exige une
+`wooPricePublication.state = woo_verified` correspondant exactement au `savedAt` de la
+dernière proposition, une fiche active et non bloquée et un produit non archivé. Les
+alertes de marge rouges sont distinctes de cette validation de publication.
 
 ## Prix WooCommerce (US / MX)
 

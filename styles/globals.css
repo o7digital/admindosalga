@@ -101,6 +101,7 @@ h1 { font-size: clamp(27px, 2.2vw, 38px); margin: 9px 0 4px; letter-spacing: 0; 
 .wp-sync-banner button { border: 1px solid #b01828; background: #b01828; color: white; padding: 7px 10px; font-size: 9px; font-weight: 800; display: inline-flex; align-items: center; gap: 6px; }
 
 .catalog-card { margin-top: 14px; background: white; border: 1px solid var(--line); box-shadow: 0 12px 40px rgba(24,24,24,.025); }
+.catalog-flow-note { margin: 14px 0; color: #59616b; font-size: 12px; line-height: 1.6; }
 .compact-card table { min-width: 760px; }
 .catalog-head { min-height: 58px; border-bottom: 1px solid var(--line); padding: 0 17px; display: flex; justify-content: space-between; align-items: center; gap: 16px; }
 .tabs { align-self: stretch; display: flex; gap: 5px; }

@@ -334,6 +334,16 @@ export default function ProductControl({ user }) {
     if (result.source === 'postgresql') persistProducts(nextProducts);
   };
 
+  const refreshCatalog = async () => {
+    try {
+      const response = await fetch('/api/wp/intake', { method: 'POST' });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || 'Les nouveaux produits n’ont pas pu être importés.');
+    } finally {
+      await loadProducts();
+    }
+  };
+
   const loadCjConnection = async () => {
     const response = await fetch('/api/cj/status', { cache: 'no-store' });
     const result = await response.json();
@@ -349,7 +359,7 @@ export default function ProductControl({ user }) {
   };
 
   useEffect(() => {
-    loadProducts().catch((loadError) => setError(loadError.message || 'Products could not be loaded.'));
+    refreshCatalog().catch((loadError) => setError(loadError.message || 'Products could not be loaded.'));
     loadCjConnection().catch((loadError) => {
       setCjConnection({ configured: true, connected: false, mode: 'error', message: loadError.message });
     });
@@ -359,7 +369,7 @@ export default function ProductControl({ user }) {
   useEffect(() => {
     const refreshFromRailway = () => {
       if (document.visibilityState === 'visible') {
-        loadProducts().catch((loadError) => setError(loadError.message || 'Products could not be refreshed.'));
+        refreshCatalog().catch((loadError) => setError(loadError.message || 'Products could not be refreshed.'));
       }
     };
     const interval = window.setInterval(refreshFromRailway, 30000);
@@ -934,6 +944,7 @@ export default function ProductControl({ user }) {
             </div>
 
             {!isGrowthWorkspace && activeView !== 'Orders' && wpSyncStatus && <div className={`wp-sync-banner ${wpSyncStatus.status}`} role="status"><div><strong>WordPress → Railway</strong><span>{wpSyncStatus.status === 'complete' ? `${wpSyncStatus.importedCount} produits synchronisés` : wpSyncStatus.status === 'running' ? 'Synchronisation en cours…' : `Échec : ${wpSyncStatus.errorMessage || 'erreur inconnue'}`}</span><small>{new Date(wpSyncStatus.completedAt || wpSyncStatus.startedAt).toLocaleString()}</small></div>{wpSyncStatus.status === 'failed' && <button type="button" onClick={importWordPress} disabled={importingWp}><Icon name="refresh" /> Relancer</button>}</div>}
+            {!isGrowthWorkspace && activeView !== 'Orders' && <p className="catalog-flow-note">Nouveautés WooCommerce MX : ajoutées à la liste à l’ouverture, puis toutes les 30 secondes depuis le catalogue Railway. Vérifiez les coûts et le transport, puis publiez le prix : une ligne verte autorise l’affichage sur Dosalga.online. Le statut « Active » seul ne publie pas le produit.</p>}
 
             {!isGrowthWorkspace && activeView !== 'Orders' && <div className="metrics">
               <article><span>Active products</span><div className="metric-line"><strong>{metrics.active}</strong></div><small>Across both stores</small></article>

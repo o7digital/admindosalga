@@ -33,6 +33,10 @@ test('only the two verified primary administrator emails grant access', () => {
     assert.equal(adminUser(clerkUser(email)).authorized, false);
   }
   assert.equal(adminUser(clerkUser(undefined, 'unverified')).authorized, false);
+  assert.equal(adminUser(clerkUser('dosalga.fac@gmail.com', 'reserved')).authorized, false);
+  const pendingGuillermo = clerkUser('dosalga.fac@gmail.com');
+  pendingGuillermo.emailAddresses[0].verification = null;
+  assert.equal(adminUser(pendingGuillermo).authorized, false, 'a provisioned account must verify its email before accessing the admin');
   assert.equal(adminUser({ ...clerkUser(), banned: true }).authorized, false);
   const secondary = clerkUser('stranger@gmail.com');
   secondary.emailAddresses.push({ id: 'email_secondary', emailAddress: 'olivier.steineur@gmail.com', verification: { status: 'verified' } });

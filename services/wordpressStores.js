@@ -1,7 +1,7 @@
 import { convertSourcePrice, normalizeWooPrice } from '../lib/wooPricing.mjs';
 import { getPricingRules, pricingRuleForProduct } from '../lib/pricingRules';
 
-const storeSources = [
+export const storeSources = [
   {
     id: 'dosalga-mexico',
     name: 'Dosalga México',
@@ -89,7 +89,7 @@ const fetchStoreProducts = async (source) => {
   return pages.flatMap((page) => page.products);
 };
 
-const mapWooProduct = (product, source, rules = []) => {
+export const mapWooProduct = (product, source, rules = []) => {
   const category = product.categories?.[0]?.name || 'General';
   const categorySlug = product.categories?.[0]?.slug || '';
   const pricingRule = pricingRuleForProduct({ ...product, siteId: source.id, categorySlug }, rules);

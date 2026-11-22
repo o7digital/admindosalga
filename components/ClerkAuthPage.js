@@ -13,6 +13,7 @@ export default function ClerkAuthPage({ configured, unavailable = false, signUp 
       <span className="auth-eyebrow">ESPACE ADMINISTRATION</span>
       <h1>{signUp ? 'Créez votre compte Dosalga' : 'Bienvenue chez Dosalga'}</h1>
       <p>{signUp ? 'Utilisez votre adresse administrateur et vérifiez votre email pour créer votre compte.' : 'Connectez-vous pour accéder à la gestion des boutiques Dosalga.'}</p>
+      {!signUp && <p className="auth-hint">Sans mot de passe, utilisez le code de connexion reçu par email. Si Clerk indique « aucun compte », <Link href={`/sign-up?next=${encodeURIComponent(destination)}`}>créez votre compte</Link> avec votre adresse administrateur, puis vérifiez votre email.</p>}
       {!configured || unavailable ? (
         <p className="auth-error" role="alert">La connexion est temporairement indisponible. Réessayez dans quelques instants.</p>
       ) : (

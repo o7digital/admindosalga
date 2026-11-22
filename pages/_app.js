@@ -7,7 +7,11 @@ export default function App({ Component, pageProps }) {
   return (
     <ClerkProvider
       {...pageProps}
-      localization={frFR}
+      localization={{
+        ...frFR,
+        signIn: { ...frFR.signIn, start: { ...frFR.signIn.start, subtitle: 'pour accéder à l’administration Dosalga' } },
+        signUp: { ...frFR.signUp, start: { ...frFR.signUp.start, subtitle: 'pour accéder à l’administration Dosalga' } },
+      }}
       signInUrl="/sign-in"
       signUpUrl="/sign-up"
       signInFallbackRedirectUrl="/"
