@@ -55,6 +55,14 @@ try {
   const cj = pendingCjProduct({ productId: 'pid-shoe', sku: fixture.sku, nameEn: 'CJ shoe', sellPrice: '5.07' }, 'US');
   await upsertProducts([cj], { onlyMissing: true });
   const pending = await read(cj.id);
+  const freshCj = pendingCjProduct({ productId: 'pid-new-shoe', sku: 'TEST-NEW-CJ', nameEn: 'New CJ shoe', sellPrice: '6.20' }, 'US');
+  const cjBatch = [cj, freshCj].map(product => ({ ...product,
+    catalogSourceSnapshot: sourceSnapshot(product, 'cj-my-products'),
+  }));
+  assert.equal((await saveCatalogSourceProducts(cjBatch, 'cj-my-products', 'US')).importedCount, 1,
+    'an existing US draft without a Woo ID must not suppress unrelated new CJ products in its batch');
+  assert.equal((await read(freshCj.id)).woo_product_id, null);
+  assert.equal((await saveCatalogSourceProducts(cjBatch, 'cj-my-products', 'US')).importedCount, 0);
   const us = { ...cj, id: 'wp-dosalga-usa-100000002', productUrl: 'https://wp-dosalga-us.o7digitalgroup.com/?post_type=product&p=100000002',
     catalogSourceSnapshot: sourceSnapshot({ ...cj, salePrice: 40 }, 'woocommerce-us', { stock_quantity: 5, status: 'publish' }) };
   assert.equal((await saveCatalogSourceProducts([us], 'woocommerce-us', 'US')).importedCount, 0);
