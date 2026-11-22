@@ -65,8 +65,8 @@ async function handler(req, res) {
       wooVerified: true,
       wooUpdated: woo.updated.length,
     };
-    await finishWooPricePublication(productId, operation, publication);
-    return res.status(200).json({ publication });
+    const sourceReview = await finishWooPricePublication(productId, operation, publication, product.catalogSources);
+    return res.status(200).json({ publication, ...sourceReview });
   } catch (error) {
     if (operation) {
       await finishWooPricePublication(productId, operation, {

@@ -1,6 +1,7 @@
 import { withAuth } from '@/lib/adminAuth';
 import { databaseIsAvailable } from '@/lib/productRepository';
 import { getWordPressSyncStatus } from '@/lib/wordpressSyncRepository';
+import { catalogSyncStatus } from '@/lib/catalogSyncRepository';
 
 async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
@@ -10,7 +11,7 @@ async function handler(req, res) {
   }
 
   try {
-    return res.status(200).json({ database: 'connected', sync: await getWordPressSyncStatus() });
+    return res.status(200).json({ database: 'connected', sync: await getWordPressSyncStatus(), automatic: await catalogSyncStatus() });
   } catch (error) {
     return res.status(500).json({ database: 'error', message: error.message });
   }

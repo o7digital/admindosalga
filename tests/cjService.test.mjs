@@ -1,6 +1,26 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+test('My Products pagination reads only the account catalogue and rejects an ignored page cursor', async () => {
+  process.env.CJ_ACCESS_TOKEN = 'test-token';
+  delete process.env.DATABASE_URL;
+  const { getCjMyProductsPage } = await import('../services/cjdropshipping.js');
+  const original = global.fetch;
+  global.fetch = async url => {
+    const parsed = new URL(url);
+    assert.equal(parsed.pathname, '/api2.0/v1/product/myProduct/query');
+    assert.equal(parsed.searchParams.get('pageNum'), '1');
+    return { ok: true, status: 200, json: async () => ({ result: true,
+      data: { pageNumber: 1, totalPages: 2, content: [{ productId: 'p1', sku: 'CJ1' }] } }) };
+  };
+  try {
+    assert.equal((await getCjMyProductsPage(1)).hasMore, true);
+    global.fetch = async () => ({ ok: true, status: 200, json: async () => ({ result: true,
+      data: { pageNumber: 1, totalPages: 2, content: [{ productId: 'p1', sku: 'CJ1' }] } }) });
+    await assert.rejects(getCjMyProductsPage(2), /invalid page/);
+  } finally { global.fetch = original; }
+});
+
 test('CJ variant loading recovers from a QPS error delivered with HTTP 200', async () => {
   process.env.CJ_ACCESS_TOKEN = 'test-token';
   delete process.env.DATABASE_URL;

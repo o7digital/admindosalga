@@ -37,6 +37,16 @@ const request = async (market, path, options = {}) => {
 
 const money = (price) => Number(price).toFixed(2);
 
+export const getWooCatalogPage = async (market, page = 1) => {
+  const params = new URLSearchParams({
+    page: String(page), per_page: '100', status: 'any', orderby: 'id', order: 'asc',
+    _fields: 'id,name,sku,status,permalink,price,regular_price,sale_price,images,categories,stock_status,stock_quantity,date_created,date_modified,meta_data',
+  });
+  const products = await request(market, `/products?${params}`);
+  if (!Array.isArray(products)) throw new Error(`WooCommerce ${market} returned an invalid catalogue.`);
+  return { products, hasMore: products.length === 100 };
+};
+
 const currencyMetaKeys = {
   origin: 'dosalga_price_origin_currency',
   source: 'dosalga_price_source_currency',

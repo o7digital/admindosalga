@@ -4,6 +4,7 @@ import { productAudit, compareProductPriority } from '@/lib/productAlerts.mjs';
 import { convertSourcePrice, normalizeWooPrice } from '@/lib/wooPricing.mjs';
 import Head from 'next/head';
 import CjPriceCell from '@/components/CjPriceCell';
+import CatalogSources from '@/components/CatalogSources';
 import { useEffect, useMemo, useState } from 'react';
 import AccountMenu from '@/components/AccountMenu';
 import { calculateProductMargin, formatCurrency, formatPercent } from '@/lib/margins';
@@ -117,7 +118,7 @@ function marketFor(product) {
 }
 
 function needsProductReview(product) {
-  return product.stock <= 10
+  return product.pendingSourceChanges || product.stock <= 10
     || Boolean(product.cjChangeReport?.length)
     || calculateProductMargin(product).marginRate < 0.25;
 }
@@ -284,6 +285,8 @@ export default function ProductControl({ user }) {
   const [cjConnection, setCjConnection] = useState({ configured: false, connected: false, mode: 'checking' });
   const [importingWp, setImportingWp] = useState(false);
   const [wpSyncStatus, setWpSyncStatus] = useState(null);
+  const [automaticSources, setAutomaticSources] = useState([]);
+  const [syncingCatalog, setSyncingCatalog] = useState(false);
   const [oliviaLoading, setOliviaLoading] = useState(false);
   const [oliviaReport, setOliviaReport] = useState(null);
   const [toast, setToast] = useState('');
@@ -341,6 +344,7 @@ export default function ProductControl({ user }) {
       if (!response.ok) throw new Error(result.message || 'Les nouveaux produits n’ont pas pu être importés.');
     } finally {
       await loadProducts();
+      await loadWpSyncStatus().catch(() => {});
     }
   };
 
@@ -354,8 +358,24 @@ export default function ProductControl({ user }) {
   const loadWpSyncStatus = async () => {
     const response = await fetch('/api/wp/status', { cache: 'no-store' });
     const result = await response.json();
-    if (response.ok) setWpSyncStatus(result.sync);
+    if (response.ok) {
+      setWpSyncStatus(result.sync);
+      setAutomaticSources(result.automatic || []);
+    }
     return result;
+  };
+
+  const synchronizeNow = async () => {
+    setSyncingCatalog(true);
+    setError('');
+    try {
+      const response = await fetch('/api/catalog/sync', { method: 'POST' });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || 'Synchronisation indisponible.');
+      await refreshCatalog();
+      notify(result.skipped ? 'Une synchronisation est déjà en cours.' : 'Synchronisation terminée · consultez l’état de chaque source.');
+    } catch (failure) { setError(failure.message); }
+    finally { setSyncingCatalog(false); }
   };
 
   useEffect(() => {
@@ -670,6 +690,9 @@ export default function ProductControl({ user }) {
       ...product,
       previousSalePrice: publication.previousPrice,
       salePrice: publication.price,
+      pendingSourceChanges: publication.pendingSourceChanges ?? product.pendingSourceChanges,
+      status: 'approved',
+      catalogIntake: product.catalogIntake ? { ...product.catalogIntake, state: 'approved' } : undefined,
       priceRegistry: product.priceRegistry ? { ...product.priceRegistry,
         finalPrice: publication.price, finalCurrency: publication.currency,
         exchangeRate: publication.exchangeRate ?? product.exchangeRate,
@@ -944,7 +967,10 @@ export default function ProductControl({ user }) {
             </div>
 
             {!isGrowthWorkspace && activeView !== 'Orders' && wpSyncStatus && <div className={`wp-sync-banner ${wpSyncStatus.status}`} role="status"><div><strong>WordPress → Railway</strong><span>{wpSyncStatus.status === 'complete' ? `${wpSyncStatus.importedCount} produits synchronisés` : wpSyncStatus.status === 'running' ? 'Synchronisation en cours…' : `Échec : ${wpSyncStatus.errorMessage || 'erreur inconnue'}`}</span><small>{new Date(wpSyncStatus.completedAt || wpSyncStatus.startedAt).toLocaleString()}</small></div>{wpSyncStatus.status === 'failed' && <button type="button" onClick={importWordPress} disabled={importingWp}><Icon name="refresh" /> Relancer</button>}</div>}
-            {!isGrowthWorkspace && activeView !== 'Orders' && <p className="catalog-flow-note">Nouveautés WooCommerce MX : ajoutées à la liste à l’ouverture, puis toutes les 30 secondes depuis le catalogue Railway. Vérifiez les coûts et le transport, puis publiez le prix : une ligne verte autorise l’affichage sur Dosalga.online. Le statut « Active » seul ne publie pas le produit.</p>}
+            {!isGrowthWorkspace && activeView !== 'Orders' && <>
+              <div className="wp-sync-banner catalog-auto-status" role="status"><div><strong>Synchronisation automatique · MX + US · toutes les 10 minutes</strong>{automaticSources.map(source => <span key={source.source} className={['blocked', 'failed'].includes(source.status) ? 'danger-text' : ''}><b>{source.source}</b> · {source.status === 'complete' ? `${source.importedCount} ajout(s), ${source.updatedCount} modification(s)` : source.status === 'blocked' ? 'Accès API désactivé · réactivation CJ requise' : source.status === 'failed' ? source.message : source.status === 'partial' ? `En cours · reprise page ${source.nextPage}` : 'Synchronisation en cours'}{source.checkedAt && <small> · {new Date(source.checkedAt).toLocaleString()}</small>}</span>)}</div><button type="button" onClick={synchronizeNow} disabled={syncingCatalog}>{syncingCatalog ? 'Synchronisation…' : 'Synchroniser maintenant'}</button></div>
+              <p className="catalog-flow-note">Nouveautés et modifications CJ / WooCommerce : importées dans l’admin MX et US. Les produits CJ sans fiche boutique doivent d’abord être listés dans WooCommerce pour ce marché. Vérifiez coûts, variantes et transport, puis publiez le prix pour obtenir la validation verte. Les décisions de prix, les blocages et les archives sont conservés.</p>
+            </>}
 
             {!isGrowthWorkspace && activeView !== 'Orders' && <div className="metrics">
               <article><span>Active products</span><div className="metric-line"><strong>{metrics.active}</strong></div><small>Across both stores</small></article>
@@ -1047,8 +1073,8 @@ export default function ProductControl({ user }) {
                     const publishedCurrent = product.wooPricePublication?.state === 'woo_verified'
                       && product.wooPricePublication?.proposalSavedAt === product.cjPriceProposal?.savedAt;
                     return (
-                      <tr key={product.id} className={publishedCurrent ? 'price-success-row' : audit.critical ? 'price-alert-row' : ''}>
-                        <td><div className="product-cell"><ProductVisual product={product} /><div><strong>{product.productUrl ? <a href={product.productUrl} target="_blank" rel="noreferrer">{product.name}</a> : product.name}</strong><span>{product.brand} · {product.sku}</span>{product.marketImport?.status === 'pending_us_review' && <small className="status review">Import MX · prix et livraison US à préparer{product.marketImport.sourceBlocked ? ' · source bloquée' : ''}</small>}<small className={`status ${product.wooFrozen ? 'blocked' : product.status === 'paused' || product.status === 'review' ? 'review' : product.stock <= 10 ? 'low-stock' : ''}`}>{product.wooFrozen ? 'Bloqué dans WooCommerce' : product.status}</small>{audit.issues.length > 0 && <small className="product-alert-reason">⚠ {audit.issues[0].message}</small>}{product.wooFrozen ? <span className="sale-blocked-badge">⛔ Vente bloquée</span> : <button type="button" className="block-sale-button" disabled={blockingProductId === product.id} onClick={() => blockProductSale(product)}>{blockingProductId === product.id ? 'Blocage…' : 'Bloquer la vente'}</button>}</div></div></td>
+                      <tr key={product.id} className={product.pendingSourceChanges ? 'source-review-row' : publishedCurrent ? 'price-success-row' : audit.critical ? 'price-alert-row' : ''}>
+                        <td><div className="product-cell"><ProductVisual product={product} /><div><strong>{product.productUrl ? <a href={product.productUrl} target="_blank" rel="noreferrer">{product.name}</a> : product.name}</strong><span>{product.brand} · {product.sku}</span>{product.marketImport?.status === 'pending_us_review' && <small className="status review">Import MX · prix et livraison US à préparer{product.marketImport.sourceBlocked ? ' · source bloquée' : ''}</small>}<small className={`status ${product.wooFrozen ? 'blocked' : product.status === 'paused' || product.status === 'review' ? 'review' : product.stock <= 10 ? 'low-stock' : ''}`}>{product.wooFrozen ? 'Bloqué dans WooCommerce' : product.status}</small>{audit.issues.length > 0 && <small className="product-alert-reason">⚠ {audit.issues[0].message}</small>}<CatalogSources product={product} />{product.wooFrozen ? <span className="sale-blocked-badge">⛔ Vente bloquée</span> : <button type="button" className="block-sale-button" disabled={blockingProductId === product.id} onClick={() => blockProductSale(product)}>{blockingProductId === product.id ? 'Blocage…' : 'Bloquer la vente'}</button>}</div></div></td>
                         <td><span className={`market-badge ${marketFor(product) === 'USA' ? 'usa' : 'mexico'}`}>{marketFor(product) !== 'Both' && <span className={`flag ${marketFor(product) === 'USA' ? 'us' : 'mx'}`} />}{marketFor(product)}</span></td>
                         <td className="shipping-cost-cell"><VariantFreight product={product} onUpdated={(id, freight) => setProducts(current => current.map(item => item.id === id ? { ...item, variantFreight: freight } : item))} /></td>
                         <td><span className={`currency-pill ${product.currencyMismatch ? 'currency-mismatch' : ''}`}>{product.saleCurrency}</span><strong className="railway-price-value">{formatCurrency(product.salePrice, product.saleCurrency)}</strong><small className="currency-source">Origine Railway : {formatCurrency(product.sourcePrice, product.sourceCurrency)}</small><small className="currency-source">Final Railway : {formatCurrency(product.salePrice, product.saleCurrency)}</small><small className={product.priceRegistry?.verified ? 'included' : 'danger-text'}>{product.priceRegistry?.verified ? '● Devise vérifiée par produit' : '⚠ Devise à vérifier'}</small>{product.priceImportRule === 'caps-native-mxn-v1' && <small className="currency-source native-price-rule">CAPS · prix natif MXN</small>}{product.currencyMismatch && <small className="danger-text">Expected {product.expectedStoreCurrency}</small>}</td>

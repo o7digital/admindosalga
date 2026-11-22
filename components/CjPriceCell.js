@@ -22,7 +22,7 @@ export default function CjPriceCell({ product, onSaved, onPublished, disabled })
   const margin = calculateProductMargin({ ...product, salePrice: Number(price), shippingIncluded });
   const unchanged = saved && Number(price) === saved.price && shippingIncluded === saved.shippingIncluded
     && Number(minDays) === saved.minDeliveryDays && Number(maxDays) === saved.maxDeliveryDays;
-  const publishedCurrent = unchanged && publication?.state === 'woo_verified' && publication?.proposalSavedAt === saved?.savedAt;
+  const publishedCurrent = unchanged && !product.pendingSourceChanges && publication?.state === 'woo_verified' && publication?.proposalSavedAt === saved?.savedAt;
   const publicationBlocked = ['sending', 'unknown'].includes(publication?.state);
 
   useEffect(() => {
@@ -66,7 +66,7 @@ export default function CjPriceCell({ product, onSaved, onPublished, disabled })
     const result = await response.json();
     if (!response.ok) throw new Error(result.message || 'Publication WooCommerce impossible. Le brouillon reste enregistré.');
     setPublication(result.publication);
-    onPublished?.(product.id, result.publication);
+    onPublished?.(product.id, { ...result.publication, pendingSourceChanges: result.pendingSourceChanges });
   };
   const save = async event => {
     event.preventDefault();
@@ -78,6 +78,8 @@ export default function CjPriceCell({ product, onSaved, onPublished, disabled })
     } catch (failure) { setError(failure.message); }
     finally { setSaving(false); }
   };
+
+  if (product.catalogIntake?.needsWooListing) return <td className="cj-price-cell"><p className="cj-price-note">Produit CJ importé. Listez-le d’abord dans WooCommerce pour ce marché depuis CJ. La synchronisation le rattachera automatiquement ici ; vous pourrez ensuite vérifier le transport et publier son prix.</p><a href="https://www.cjdropshipping.com/my.html#/products/connection" target="_blank" rel="noreferrer">Ouvrir CJ · produits de boutique</a></td>;
 
   return <td className="cj-price-cell"><form onSubmit={save} aria-label={`Update WooCommerce price for ${product.name}`}>
     <fieldset disabled={saving || suggesting || disabled}>
@@ -91,7 +93,7 @@ export default function CjPriceCell({ product, onSaved, onPublished, disabled })
       {suggesting && <small role="status">Hugging Face…</small>}
       {ai && <small role="status">{ai.provider === 'huggingface' ? 'Hugging Face' : 'Calcul de secours · sans IA'} · {ai.reason} · FX {ai.exchangeRate} ({ai.fxDate}){ai.providerError && <span> {ai.providerError}</span>}</small>}
       <button type="submit" value="draft" className="cj-save" disabled={unchanged}>{saving ? 'Enregistrement…' : unchanged ? 'Brouillon enregistré' : 'Enregistrer le brouillon'}</button>
-      {!publishedCurrent && <button type="submit" value="publish" className="cj-save" disabled={publicationBlocked}>{saving ? 'Publication…' : unchanged ? 'Publier ce prix dans WooCommerce' : 'Enregistrer et publier dans WooCommerce'}</button>}
+      {!publishedCurrent && <button type="submit" value="publish" className="cj-save" disabled={publicationBlocked}>{saving ? 'Publication…' : product.pendingSourceChanges ? 'Vérifier et republier ce prix' : unchanged ? 'Publier ce prix dans WooCommerce' : 'Enregistrer et publier dans WooCommerce'}</button>}
     </fieldset>
     <small className="cj-price-note" role="status">{unchanged ? (publishedCurrent ? 'Prix confirmé ci-dessous' : 'Brouillon enregistré · publication WooCommerce requise') : 'Prix saisi non publié · vérifiez les délais puis enregistrez ou publiez'}</small>
     {publishedCurrent && <p role="status" className="woo-confirmation">✓ Confirmé dans WooCommerce : {formatCurrency(publication.price, publication.currency)}</p>}

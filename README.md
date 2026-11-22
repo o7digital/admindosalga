@@ -68,25 +68,59 @@ La synchronisation de coût CJ fonctionne par lots de quatre produits. Elle met 
 coût CJ et conserve séparément le stock CJ, sans écraser le stock de vente WooCommerce.
 L'import d'un produit individuel peut également récupérer les routes et coûts de livraison.
 
-### Arrivée des nouveaux produits MX
+### Synchronisation automatique CJ / WooCommerce — MX et US
 
-Le circuit est **CJ → WooCommerce MX → snapshot Railway → file de contrôle admin →
-publication du prix vérifiée → Dosalga.online**. Aucun email n’est lu par l’admin et un
-produit ajouté uniquement dans CJ doit d’abord être listé dans WooCommerce MX.
+Un cron Vercel appelle `GET /api/catalog/sync` toutes les dix minutes, même quand
+l’admin est fermé. `CRON_SECRET` doit être configuré en production ; les appels
+sans ce secret sont refusés. Le bouton « Synchroniser maintenant » utilise une
+session administrateur et la protection d’origine habituelle via `POST`.
 
-`POST /api/wp/intake`, réservé aux administrateurs, ajoute les fiches publiées présentes
-dans `storefront_catalog_products` mais absentes de l’admin. Le dashboard l’appelle à
-l’ouverture et lors de son actualisation toutes les 30 secondes pendant qu’il est visible.
-L’alimentation du snapshot dépend du webhook/sync WooCommerce du storefront. L’import
-WordPress manuel reste disponible. L’arrivée automatique crée des fiches à contrôler,
-sans supposer les conditions de livraison, ni approuver leur prix. Elle préserve les
-fiches existantes, y compris celles bloquées ou archivées ; un verrou transactionnel et
-une seconde vérification d’identité empêchent deux actualisations d’écraser les décisions.
+Les trois sources sont indépendantes : WooCommerce MX, WooCommerce US et
+**CJ My Products** (`/product/myProduct/query`, catalogue du compte uniquement).
+Chaque source parcourt toutes ses pages. Un curseur PostgreSQL reprend au prochain
+passage si le budget de temps est atteint ; un échec de page n’est jamais marqué
+comme un import complet. Un verrou avec expiration empêche les exécutions parallèles.
+Le tableau affiche la dernière vérification et les erreurs par source. La migration
+`012_catalog_sync.sql` prépare cet état persistant.
+
+Les nouveautés WooCommerce, y compris les brouillons, arrivent dans le marché
+correspondant en attente de contrôle. Les ajouts CJ sans fiche WooCommerce arrivent
+dans les deux files MX et US, avec prix de vente nul, devises séparées et transport
+non confirmé. Le coût catalogue CJ est indicatif : il ne remplace pas le coût vérifié
+des variantes. Pour publier un produit ajouté seulement dans My Products, il faut
+d’abord le lister dans WooCommerce pour ce marché depuis CJ. La synchronisation le
+rattache ensuite par SKU au brouillon existant, sans dupliquer la fiche.
+
+Les modifications sont conservées dans `store_listings.metadata.catalogSources`,
+avec une empreinte stable, leurs valeurs et les champs modifiés. « Dernières données
+source » permet de les examiner. Elles ne remplacent pas les décisions de prix,
+la devise, le transport, les blocages ni les archives. Le premier passage établit
+une référence pour les anciennes fiches. Les suivants signalent les changements ;
+le retour d’un prix que l’admin vient lui-même de publier n’est pas une nouvelle
+anomalie. Une validation manuelle par publication du prix acquitte uniquement les
+données source effectivement vues, sans effacer une modification arrivée entre-temps.
+
+`POST /api/wp/intake` récupère aussi les nouveautés des snapshots Railway MX et US
+à l’ouverture et toutes les 30 secondes tant que le dashboard est visible. Ce chemin
+rapide et les imports manuels préservent les données et décisions de synchronisation.
+L’import utilise les catalogues des boutiques, jamais la sélection publique déjà filtrée.
+Aucun email n’est lu et aucun produit n’est automatiquement mis en vente.
+
+**Prérequis CJ :** réactiver l’API du compte dans My CJ → Authorize → API Stores.
+Un refus « API access has been disabled » est affiché comme bloqué, tandis que les
+imports WooCommerce MX et US continuent. `CJ_API_KEY` permet de renouveler les jetons ;
+`CJ_ACCESS_TOKEN` reste utilisable si valide. La pagination CJ est vérifiée d’après la
+réponse, afin de refuser une API qui renverrait indéfiniment la première page.
+
+Vérifications : `npm test`, `npm run build`, puis `npm run test:auth` contre
+l’application lancée. `CATALOG_TEST_DATABASE_URL=… npm run test:catalog-sync` exerce
+les vraies requêtes PostgreSQL dans un schéma temporaire isolé et supprimé à la fin :
+rattachement des produits US, absence de doublons, protection des prix/blocages/archives,
+préservation des imports manuels et modification arrivant pendant une validation.
 
 Le statut local « Active » seul ne publie pas un produit. Le storefront MX exige une
 `wooPricePublication.state = woo_verified` correspondant exactement au `savedAt` de la
-dernière proposition, une fiche active et non bloquée et un produit non archivé. Les
-alertes de marge rouges sont distinctes de cette validation de publication.
+dernière proposition, une fiche active et non bloquée et un produit non archivé.
 
 ## Prix WooCommerce (US / MX)
 

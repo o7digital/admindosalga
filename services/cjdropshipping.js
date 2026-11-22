@@ -115,6 +115,17 @@ export const getCjShops = async () => {
   }));
 };
 
+export const getCjMyProductsPage = async (page = 1) => {
+  const response = await cjRequest('/product/myProduct/query', { query: { pageNum: page, pageNumber: page, pageSize: 100 } });
+  const data = response.data;
+  if (!Array.isArray(data?.content) || Number(data.pageNumber) !== page
+    || !Number.isInteger(Number(data.totalPages)) || Number(data.totalPages) < 0
+    || (data.content.length > 0 && Number(data.totalPages) < page)) {
+    throw new Error('CJ My Products returned an invalid page; synchronization was not marked complete.');
+  }
+  return { products: data.content, hasMore: page < Number(data.totalPages) };
+};
+
 const extractIdentifier = (input = '') => {
   const raw = String(input || '').trim();
   if (!raw) return '';

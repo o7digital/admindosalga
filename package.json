@@ -8,6 +8,7 @@
     "start": "next start",
     "test": "node --test tests/*.test.mjs",
     "test:auth": "node tests/auth.integration.mjs",
+    "test:catalog-sync": "node tests/catalogSync.integration.mjs",
     "db:migrate": "node scripts/migrate.js",
     "db:verify": "node scripts/verify-database.js",
     "catalog:import-us": "node scripts/import-mx-to-us.mjs"

@@ -16,6 +16,8 @@ const clerk = clerkMiddleware(async (auth, request) => {
 }, { signInUrl: '/sign-in', signUpUrl: '/sign-up' });
 
 export default function middleware(request, event) {
+  // The scheduler authenticates with its own secret inside this exact handler.
+  if (request.nextUrl.pathname === '/api/catalog/sync' && request.method === 'GET') return NextResponse.next();
   if (isClerkConfigured()) return clerk(request, event);
   if (isPublicRoute(request)) return NextResponse.next();
   if (request.nextUrl.pathname.startsWith('/api/')) return unauthorized(503, 'Connexion temporairement indisponible.');

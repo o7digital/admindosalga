@@ -2,6 +2,22 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { intakeMexicanCatalog } from '../lib/catalogIntake.mjs';
 
+test('MX and US arrivals stay in their own markets and retain independent review queues', async () => {
+  const seen = [];
+  await intakeMexicanCatalog({
+    query: async () => ({ rows: [
+      { store_id: 'MX', payload: { id: 1 } }, { store_id: 'US', payload: { id: 1 } },
+    ] }),
+    mapProduct: (raw, market) => { seen.push(market); return { id: `${market}-${raw.id}` }; },
+    saveProducts: async products => {
+      assert.deepEqual(products.map(p => p.catalogIntake.source), ['woocommerce-mx', 'woocommerce-us']);
+      assert.ok(products.every(p => p.status === 'review' && !p.wooPricePublication));
+      return products;
+    },
+  });
+  assert.deepEqual(seen, ['MX', 'US']);
+});
+
 test('new WooCommerce arrivals enter review without assumed delivery terms or a publication', async () => {
   let saved;
   const result = await intakeMexicanCatalog({

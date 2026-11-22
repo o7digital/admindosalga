@@ -102,6 +102,13 @@ h1 { font-size: clamp(27px, 2.2vw, 38px); margin: 9px 0 4px; letter-spacing: 0; 
 
 .catalog-card { margin-top: 14px; background: white; border: 1px solid var(--line); box-shadow: 0 12px 40px rgba(24,24,24,.025); }
 .catalog-flow-note { margin: 14px 0; color: #59616b; font-size: 12px; line-height: 1.6; }
+.catalog-auto-status > div { align-items: flex-start; flex-direction: column; }
+.catalog-source-details { max-width: 320px; margin-top: 8px; font-size: 11px; line-height: 1.5; }
+.catalog-source-details summary { cursor: pointer; color: #815500; font-weight: 700; }
+.catalog-source-details dl { margin: 6px 0; }
+.catalog-source-details dt { font-weight: 700; }
+.catalog-source-details dd { margin: 0 0 5px; overflow-wrap: anywhere; }
+.source-review-row > td { background: #fff7df; }
 .compact-card table { min-width: 760px; }
 .catalog-head { min-height: 58px; border-bottom: 1px solid var(--line); padding: 0 17px; display: flex; justify-content: space-between; align-items: center; gap: 16px; }
 .tabs { align-self: stretch; display: flex; gap: 5px; }

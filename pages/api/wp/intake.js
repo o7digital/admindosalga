@@ -2,7 +2,7 @@ import { withAuth } from '@/lib/adminAuth';
 import { query } from '@/lib/db';
 import { databaseIsAvailable, upsertProducts } from '@/lib/productRepository';
 import { getPricingRules } from '@/lib/pricingRules';
-import { intakeMexicanCatalog } from '@/lib/catalogIntake.mjs';
+import { intakeCatalog } from '@/lib/catalogIntake.mjs';
 import { mapWooProduct, storeSources } from '@/services/wordpressStores';
 
 async function handler(req, res) {
@@ -10,10 +10,9 @@ async function handler(req, res) {
   if (!databaseIsAvailable()) return res.status(503).json({ message: 'PostgreSQL est nécessaire pour importer les nouveautés.' });
   try {
     const rules = await getPricingRules();
-    const source = storeSources.find(store => store.id === 'dosalga-mexico');
-    const result = await intakeMexicanCatalog({
+    const result = await intakeCatalog({
       query,
-      mapProduct: product => mapWooProduct(product, source, rules),
+      mapProduct: (product, market) => mapWooProduct(product, storeSources.find(store => store.id === (market === 'US' ? 'dosalga-usa' : 'dosalga-mexico')), rules),
       saveProducts: upsertProducts,
     });
     return res.status(200).json(result);
