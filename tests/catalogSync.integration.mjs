@@ -15,7 +15,7 @@ let pool;
 try {
   await control.query(`CREATE SCHEMA "${schema}"`);
   await control.query(`SET search_path TO "${schema}", public`);
-  await control.query(`CREATE TABLE storefront_catalog_products (store_id TEXT,woo_id BIGINT,sku TEXT,price NUMERIC,payload JSONB,synced_at TIMESTAMPTZ)`);
+  await control.query(`CREATE TABLE storefront_catalog_products (store_id TEXT,woo_id BIGINT,sku TEXT,price NUMERIC,payload JSONB,synced_at TIMESTAMPTZ,status TEXT DEFAULT 'publish')`);
   const files = (await fs.readdir(new URL('../db/migrations/', import.meta.url))).filter(f => f.endsWith('.sql')).sort();
   for (const file of files) await control.query(await fs.readFile(new URL(`../db/migrations/${file}`, import.meta.url), 'utf8'));
   const { db, query } = await import('../lib/db.js');
@@ -73,6 +73,18 @@ try {
   assert.equal(Number(linked.sale_price), 0, 'no MX price or unvalidated Woo price leaks into US');
   assert.equal(linked.metadata.catalogIntake.needsWooListing, false);
   assert.equal((await query("SELECT count(*) FROM store_listings l JOIN stores s ON s.id=l.store_id WHERE s.code='US' AND l.woo_sku=$1", [fixture.sku])).rows[0].count, '1');
+
+  const { intakeCatalog } = await import('../lib/catalogIntake.mjs');
+  for (const market of ['MX', 'US']) await query(`INSERT INTO storefront_catalog_products(store_id,woo_id,payload)
+    VALUES($1,100000099,$2::JSONB)`, [market, JSON.stringify({ id: 100000099, sku: 'TEST-INTAKE' })]);
+  await query(`INSERT INTO storefront_catalog_products(store_id,woo_id,payload) VALUES('MX',100000003,$1::JSONB)`, [JSON.stringify({ id: 100000003, sku: blocked.sku.toLowerCase() })]);
+  const intakeOptions = { query, saveProducts: upsertProducts, mapProduct: (raw, market) => ({
+    id: `wp-dosalga-${market === 'MX' ? 'mexico' : 'usa'}-${raw.id}`,
+    siteId: market === 'MX' ? 'dosalga-mexico' : 'dosalga-usa', sku: raw.sku, name: 'Snapshot arrival',
+    salePrice: 0, sourcePrice: 0, sourceCurrency: market === 'MX' ? 'MXN' : 'USD', saleCurrency: market === 'MX' ? 'MXN' : 'USD',
+  }) };
+  assert.equal((await intakeCatalog(intakeOptions)).importedCount, 2, 'snapshot lookup keeps the two markets separate and preserves archives');
+  assert.equal((await intakeCatalog(intakeOptions)).importedCount, 0);
 
   row = await read(fixture.id);
   const observed = row.metadata.catalogSources;
