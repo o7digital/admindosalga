@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { calculateProductMargin, formatCurrency, formatPercent } from '@/lib/margins';
 import { suggestCjPrice } from '@/lib/cjPricing.mjs';
 import { freightDeliveryRange } from '@/lib/variantFreight.mjs';
+import { sourceRevisionMap } from '@/lib/cjPublication.mjs';
 
 export default function CjPriceCell({ product, onSaved, onPublished, disabled }) {
   const saved = product.cjPriceProposal?.currency === product.saleCurrency ? product.cjPriceProposal : null;
@@ -61,7 +62,8 @@ export default function CjPriceCell({ product, onSaved, onPublished, disabled })
   const publishDraft = async proposal => {
     const response = await fetch('/api/woocommerce/publish-price', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ productId: product.id, savedAt: proposal.savedAt, confirmAllVariants: true }),
+      body: JSON.stringify({ productId: product.id, savedAt: proposal.savedAt, confirmAllVariants: true,
+        reviewedSourceRevisions: sourceRevisionMap(product.catalogSources) }),
     });
     const result = await response.json();
     if (!response.ok) throw new Error(result.message || 'Publication WooCommerce impossible. Le brouillon reste enregistré.');

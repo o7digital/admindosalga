@@ -1,6 +1,6 @@
 import { withAuth } from '@/lib/adminAuth';
 import { databaseIsAvailable, listProducts, beginWooPricePublication, finishWooPricePublication, stageRailwayPricePublication } from '@/lib/productRepository';
-import { listingIdentity } from '@/lib/cjPublication.mjs';
+import { listingIdentity, sourceRevisionsMatch } from '@/lib/cjPublication.mjs';
 import { hasWooWriteCredentials, publishWooPrice, reviewWooPrice } from '@/services/woocommerce';
 
 export const config = { maxDuration: 60 };
@@ -15,6 +15,9 @@ async function handler(req, res) {
     productId = req.method === 'GET' ? req.query.productId : req.body?.productId;
     const product = (await listProducts()).find(item => item.id === productId);
     if (!product) return res.status(404).json({ message: 'Product not found.' });
+    if (req.method === 'POST' && !sourceRevisionsMatch(req.body?.reviewedSourceRevisions, product.catalogSources)) {
+      return res.status(409).json({ message: 'Les données source ont changé depuis votre dernier affichage. Actualisez le produit et vérifiez les modifications avant de publier.' });
+    }
 
     const identity = listingIdentity(product);
     const proposal = product.cjPriceProposal;

@@ -1,6 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { listingIdentity, selectShop, publicationVariants, allVariantsAccepted } from '../lib/cjPublication.mjs';
+import { listingIdentity, selectShop, publicationVariants, allVariantsAccepted, sourceRevisionMap, sourceRevisionsMatch } from '../lib/cjPublication.mjs';
+
+test('publication accepts only the source revisions actually displayed to the reviewer', () => {
+  const sources = { 'woocommerce-mx': { revision: 'new' }, 'cj-my-products': { revision: 'cost-2' } };
+  assert.equal(sourceRevisionsMatch(sourceRevisionMap(sources), sources), true);
+  assert.equal(sourceRevisionsMatch({ 'cj-my-products': 'cost-2', 'woocommerce-mx': 'new' }, sources), true);
+  assert.equal(sourceRevisionsMatch({ 'woocommerce-mx': 'old', 'cj-my-products': 'cost-2' }, sources), false);
+  assert.equal(sourceRevisionsMatch({ 'woocommerce-mx': 'new' }, sources), false);
+  assert.equal(sourceRevisionsMatch(undefined, sources), false);
+  assert.equal(sourceRevisionsMatch(undefined, undefined), true);
+});
 const identity = listingIdentity({ id: 'wp-dosalga-mexico-123' });
 const shop = { id: 'shop', name: 'wp-dosalga-mx.o7digitalgroup.com', type: 'Woocommerce', status: 1, currencyCode: 'MXN' };
 const detail = { platformProductId: '123', platformProductPricesCurrency: 'MXN', shopProductStatus: 1, variants: [{ platformProductId: '123', platformVariantId: 'v1', platformVariantSku: 'sku', platformVariantTitle: 'Large', platformVariantImage: 'https://example.com/image.jpg', priceCurrency: 'MXN' }] };
