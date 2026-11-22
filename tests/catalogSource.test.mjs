@@ -55,3 +55,12 @@ test('cron authentication rejects absent configuration, malformed credentials an
   assert.equal(cronAuthorized('Bearer undefined', undefined), false);
   assert.equal(cronAuthorized('Bearer ', ''), false);
 });
+
+test('category changes enter source review while newly tracked fields establish a baseline first', () => {
+  const product = { name: 'Shoe', sku: 'CJ1', category: 'Shoes', salePrice: 650, saleCurrency: 'MXN' };
+  const old = sourceSnapshot(product, 'woocommerce-mx');
+  const next = sourceSnapshot({ ...product, category: 'Womens shoes' }, 'woocommerce-mx');
+  assert.deepEqual(sourceChanges(old, next, { sale_price: 650, currency_code: 'MXN' }), ['category']);
+  delete old.data.category;
+  assert.deepEqual(sourceChanges(old, next, { sale_price: 650, currency_code: 'MXN' }), []);
+});

@@ -1,4 +1,4 @@
-const labels = { name: 'Nom', sku: 'SKU', image: 'Image', price: 'Prix boutique', currency: 'Devise boutique',
+const labels = { name: 'Nom', sku: 'SKU', image: 'Image', category: 'Catégorie', price: 'Prix boutique', currency: 'Devise boutique',
   costUsd: 'Coût catalogue CJ USD (indicatif)', status: 'Statut boutique', stock: 'Stock', stockStatus: 'Disponibilité' };
 
 export default function CatalogSources({ product }) {
