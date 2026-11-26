@@ -2,10 +2,29 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   applyCjCostUpdate,
+  cjCostSummary,
   mergeCjDataIntoWordPressProduct,
   overlayCjSnapshot,
   parseCjPrice,
 } from '../lib/cjData.mjs';
+
+test('catalogue recovers the SKU cost range from freight without changing the saved parent price', () => {
+  const product = { cjCostUsd: 0, cjCatalogCostUsd: 1.5, variantFreight: { variants: [
+    { cjCostUsd: 4.35 }, { cjCostUsd: '5.05' }, { cjCostUsd: 4.35 },
+  ] } };
+  assert.deepEqual(cjCostSummary(product), { min: 4.35, max: 5.05, source: 'variants', confirmed: 3, total: 3 });
+  assert.equal(product.cjCostUsd, 0);
+  assert.deepEqual(cjCostSummary({ ...product, cjCostUsd: 7 }), cjCostSummary(product));
+});
+
+test('catalogue distinguishes partial variant costs, parent cost, and indicative catalogue prices', () => {
+  assert.deepEqual(cjCostSummary({ variantFreight: { variants: [
+    { cjCostUsd: 3 }, { cjCostUsd: 0 }, { cjCostUsd: null }, { cjCostUsd: 'invalid' },
+  ] } }), { min: 3, max: 3, source: 'variants', confirmed: 1, total: 4 });
+  assert.deepEqual(cjCostSummary({ cjCostUsd: 6.62 }), { min: 6.62, max: 6.62, source: 'product' });
+  assert.equal(cjCostSummary({ cjCostUsd: 0, cjCatalogCostUsd: 6.62 }), null);
+  assert.equal(cjCostSummary({}), null);
+});
 
 test('parseCjPrice accepts scalar and range prices', () => {
   assert.equal(parseCjPrice(6.62), 6.62);

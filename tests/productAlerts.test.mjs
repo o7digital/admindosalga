@@ -48,3 +48,37 @@ test('catalogue reuses precomputed audits and keeps recent valid publications fi
  assert.equal(compareCataloguePriority(base, published), compareCataloguePriority(base, published, productAudit(base), productAudit(published)));
  assert.equal(published.salePrice, 220);
 });
+
+test('CJ drafts waiting for WooCommerce do not hide existing listings or report a missing live price', () => {
+ const draft = { ...base, id: 'cj-draft', salePrice: 0, cjCostUsd: 0,
+  catalogIntake: { needsWooListing: true, state: 'pending_review' } };
+ assert.equal(productAudit(draft).critical, false);
+ assert.ok(productAudit(draft).issues.some(issue => issue.code === 'pending-listing'));
+ assert.deepEqual([draft, published, base].sort(compareCataloguePriority).map(p => p.id), ['hoodie', 'published', 'cj-draft']);
+ assert.equal(productAudit({ ...draft, catalogIntake: { needsWooListing: false } }).critical, true);
+ assert.equal(draft.salePrice, 0);
+ const quotedDraft = { ...draft, cjCostUsd: 5, variantFreight: { method: 'CJ', variants: [
+  { cjCostUsd: 5, routes: [{ method: 'CJ', shippingCost: 7 }] },
+ ] } };
+ assert.equal(productAudit(quotedDraft).critical, false);
+ assert.ok(compareCataloguePriority(quotedDraft, published) > 0);
+});
+
+test('shipping alerts use saved per-SKU quotes even when the parent shipping field is zero', () => {
+ const quoted = { ...base, salePrice: 220, shippingUsd: 0, variantFreight: { method: 'CJ', variants: [
+  { cjCostUsd: 4, routes: [{ method: 'CJ', shippingCost: 2, totalShippingCost: 3 }] },
+  { cjCostUsd: 5, routes: [{ method: 'CJ', shippingCost: 4 }] },
+ ] } };
+ assert.equal(productAudit(quoted).shippingUsd, 4);
+ assert.ok(!productAudit(quoted).issues.some(issue => issue.code === 'missing-shipping'));
+ const partial = { ...quoted, variantFreight: { ...quoted.variantFreight,
+  variants: [...quoted.variantFreight.variants, { cjCostUsd: 5, routes: [] }] } };
+ assert.ok(productAudit(partial).issues.some(issue => issue.code === 'missing-shipping'));
+ const free = { ...quoted, variantFreight: { method: 'CJ', variants: [
+  { cjCostUsd: 4, routes: [{ method: 'CJ', shippingCost: 0 }] },
+ ] } };
+ assert.equal(productAudit(free).shippingUsd, 0);
+ assert.ok(!productAudit(free).issues.some(issue => issue.code === 'missing-shipping'));
+ assert.ok(productAudit({ ...base, shippingUsd: 0 }).issues.some(issue => issue.code === 'missing-shipping'));
+ assert.ok(!productAudit({ ...base, shippingUsd: 0, shippingConfirmed: true }).issues.some(issue => issue.code === 'missing-shipping'));
+});
