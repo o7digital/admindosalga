@@ -2,6 +2,7 @@ import VariantFreight from '@/components/VariantFreight';
 import { freightShippingTotal } from '@/lib/variantFreight.mjs';
 import { productAudit, compareCataloguePriority, isPublishedCurrent, productRowClass } from '@/lib/productAlerts.mjs';
 import { createCatalogueRefresher } from '@/lib/catalogueRefresh.mjs';
+import { createCatalogueReadGuard, retainCatalogueRows } from '@/lib/catalogueEditing.mjs';
 import { convertSourcePrice, normalizeWooPrice } from '@/lib/wooPricing.mjs';
 import Head from 'next/head';
 import CjPriceCell from '@/components/CjPriceCell';
@@ -272,7 +273,14 @@ function SociosDashboard({ market, notify }) {
 }
 
 export default function ProductControl({ user }) {
-  const [storedProducts, setProducts] = useState([]);
+  const [storedProducts, setStoredProducts] = useState([]);
+  const catalogueReadGuard = useRef(null);
+  if (!catalogueReadGuard.current) catalogueReadGuard.current = createCatalogueReadGuard();
+  const setProducts = update => {
+    catalogueReadGuard.current.changed();
+    setStoredProducts(update);
+  };
+  const [retainedCatalogue, setRetainedCatalogue] = useState(null);
   const [productsLoading, setProductsLoading] = useState(true);
   const [productPage, setProductPage] = useState(1);
   const productsRequest = useRef(null);
@@ -339,7 +347,7 @@ export default function ProductControl({ user }) {
     return productsRequest.current;
   };
 
-  const fetchProducts = async () => {
+  const fetchProducts = () => catalogueReadGuard.current.read(async () => {
     const response = await fetch(`/api/products?fresh=${Date.now()}`, { cache: 'no-store' });
     const result = await response.json();
     if (!response.ok) throw new Error(result.message || 'Products could not be loaded.');
@@ -352,8 +360,8 @@ export default function ProductControl({ user }) {
         // PostgreSQL is authoritative; local storage is only a JSON-dev fallback.
       }
     }
-    setProducts(nextProducts.map(normalizeProduct));
-  };
+    return nextProducts.map(normalizeProduct);
+  }, setStoredProducts);
 
   const refreshCatalog = () => {
     if (!catalogRefresher.current) {
@@ -485,12 +493,19 @@ export default function ProductControl({ user }) {
     return marketMatch && categoryMatch && shippingMatch && marginMatch && searchMatch;
   }).sort((a, b) => compareCataloguePriority(a, b, productAudits.get(a), productAudits.get(b))), [category, marginFilter, market, products, productAudits, query, shippingFilter]);
 
-  const filtered = useMemo(() => catalogFiltered.filter((product) => {
+  const catalogueScope = JSON.stringify([market, productTab, query, category, shippingFilter, marginFilter]);
+  const retainedIds = retainedCatalogue?.scope === catalogueScope ? retainedCatalogue.ids : null;
+  const filtered = useMemo(() => retainCatalogueRows(products, catalogFiltered.filter((product) => {
     if (productTab === 'active') return product.status === 'approved' || product.status === 'ordered';
     if (productTab === 'review') return needsProductReview(product, productAudits.get(product));
     if (productTab === 'drafts') return product.status === 'review';
     return true;
-  }), [catalogFiltered, productAudits, productTab]);
+  }), retainedIds || []), [catalogFiltered, productAudits, productTab, products, retainedIds]);
+
+  const retainWorkingCatalogue = () => setRetainedCatalogue(current => current?.scope === catalogueScope
+    ? current : { scope: catalogueScope, ids: filtered.map(product => product.id) });
+
+  useEffect(() => { setRetainedCatalogue(null); }, [catalogueScope]);
 
   useEffect(() => { setProductPage(1); }, [market, productTab, query, category, shippingFilter, marginFilter]);
 
@@ -1082,7 +1097,8 @@ export default function ProductControl({ user }) {
                 <label className="select-wrap"><select value={shippingFilter} onChange={(event) => setShippingFilter(event.target.value)}><option>All shipping</option><option>Included</option><option>Separate</option></select><Icon name="chevron" size={15} /></label>
                 <label className="select-wrap"><select value={marginFilter} onChange={(event) => setMarginFilter(event.target.value)}><option>All margins</option><option>Under 35%</option><option>35% and up</option></select><Icon name="chevron" size={15} /></label>
                 <div className="daily-fx-badge">{fx?.rate ? <><a href={fx.sourceUrl} target="_blank" rel="noreferrer">Taux officiel DOF · 1 USD = {Number(fx.rate).toFixed(4)} MXN</a><small>1 MXN = {(1 / Number(fx.rate)).toFixed(6)} USD · Dernière publication : {fx.date}</small><small>{fx.stale ? '⚠ Actualisation indisponible · dernier taux récupéré' : 'Actualisation automatique · vérification chaque heure'}</small></> : 'Taux officiel DOF indisponible'}</div>
-                <span className="result-count">{filtered.length} produits · Rouges en priorité</span>
+                <span className="result-count">{filtered.length} produits · {retainedIds ? 'Ordre conservé pendant vos modifications' : 'Rouges en priorité'}</span>
+                {retainedIds && <button type="button" className="btn secondary" onClick={() => { setRetainedCatalogue(null); setProductPage(1); }}>Actualiser le classement</button>}
               </div>
               <CataloguePagination {...paginationProps} />
               <div className="table-wrap">
@@ -1094,7 +1110,7 @@ export default function ProductControl({ user }) {
                     const audit = productAudits.get(product);
                     const publishedCurrent = isPublishedCurrent(product);
                     return (
-                      <tr key={product.id} className={productRowClass(product, audit)}>
+                      <tr key={product.id} className={productRowClass(product, audit)} onFocusCapture={retainWorkingCatalogue}>
                         <td><div className="product-cell"><ProductVisual product={product} /><div><strong>{product.productUrl ? <a href={product.productUrl} target="_blank" rel="noreferrer">{product.name}</a> : product.name}</strong><span>{product.brand} · {product.sku}</span>{product.marketImport?.status === 'pending_us_review' && <small className="status review">Import MX · prix et livraison US à préparer{product.marketImport.sourceBlocked ? ' · source bloquée' : ''}</small>}<small className={`status ${product.wooFrozen ? 'blocked' : product.status === 'paused' || product.status === 'review' ? 'review' : product.stock <= 10 ? 'low-stock' : ''}`}>{product.wooFrozen ? 'Bloqué dans WooCommerce' : product.catalogIntake?.needsWooListing ? 'Brouillon CJ · à lister' : product.status}</small>{audit.issues.length > 0 && <small className="product-alert-reason">⚠ {audit.issues[0].message}</small>}<CatalogSources product={product} />{product.wooFrozen ? <span className="sale-blocked-badge">⛔ Vente bloquée</span> : !product.catalogIntake?.needsWooListing && <button type="button" className="block-sale-button" disabled={blockingProductId === product.id} onClick={() => blockProductSale(product)}>{blockingProductId === product.id ? 'Blocage…' : 'Bloquer la vente'}</button>}</div></div></td>
                         <td><span className={`market-badge ${marketFor(product) === 'USA' ? 'usa' : 'mexico'}`}>{marketFor(product) !== 'Both' && <span className={`flag ${marketFor(product) === 'USA' ? 'us' : 'mx'}`} />}{marketFor(product)}</span></td>
                         <td className="shipping-cost-cell"><VariantFreight product={product} onUpdated={(id, freight) => setProducts(current => current.map(item => item.id === id ? { ...item, variantFreight: freight } : item))} /></td>

@@ -12,7 +12,7 @@ test('hoodie 34 MXN vs 6 USD is red and first, without changing its price', () =
 test('compares same currency; includes shipping and handles high price gaps', () => {
  assert.equal(productAudit({ ...base, salePrice: 220 }).critical, false);
  assert.equal(productAudit({ ...base, saleCurrency: 'USD', salePrice: 7 }).issues[0].code, 'negative-margin');
- assert.equal(productAudit({ ...base, saleCurrency: 'USD', salePrice: 30 }).issues[0].code, 'large-gap');
+ assert.equal(productAudit({ ...base, saleCurrency: 'USD', salePrice: 40 }).issues[0].code, 'large-gap');
  assert.equal(productAudit({ ...base, salePrice: 220, shippingUsd: 0 }).issues[0].code, 'missing-shipping');
 });
 test('audit excludes archives and returns every anomalous listing', () => {
@@ -23,7 +23,7 @@ test('audit excludes archives and returns every anomalous listing', () => {
 
 const published = { ...base, id: 'published', salePrice: 220,
  cjPriceProposal: { savedAt: '2026-11-25T10:00:00Z' },
- wooPricePublication: { state: 'woo_verified', proposalSavedAt: '2026-11-25T10:00:00Z', at: '2026-11-25T11:00:00Z' } };
+ wooPricePublication: { state: 'woo_verified', price: 220, currency: 'MXN', proposalSavedAt: '2026-11-25T10:00:00Z', at: '2026-11-25T11:00:00Z' } };
 test('catalogue puts red products ahead of reviewed and published products across the full list', () => {
  const review = { ...base, id: 'review', salePrice: 220, pendingSourceChanges: true };
  const products = [published, review, ...Array.from({length: 100}, (_, i) => ({ ...published, id: `published-${i}` })), base];
@@ -41,6 +41,23 @@ test('critical issues remain red even after publication or a source update', () 
  assert.equal(isPublishedCurrent({ ...published, pendingSourceChanges: true }), false);
  assert.equal(isPublishedCurrent({ ...published, cjPriceProposal: null }), false);
  assert.equal(isPublishedCurrent({ ...published, cjPriceProposal: { savedAt: 'newer-draft' } }), false);
+ assert.equal(isPublishedCurrent({ ...published, salePrice: 350 }), false);
+ assert.equal(isPublishedCurrent({ ...published, saleCurrency: 'USD' }), false);
+});
+
+test('a published price with normal delivered margin is not red because the bare CJ item is inexpensive', () => {
+ const item = { ...published, salePrice: 154.19, exchangeRate: 19.69, cjCostUsd: 1.03, shippingUsd: 4.35,
+  wooPricePublication: { ...published.wooPricePublication, price: 154.19 } };
+ assert.equal(productAudit(item).critical, false);
+ assert.ok(!productAudit(item).issues.some(issue => issue.code === 'large-gap'));
+ assert.equal(productRowClass(item), 'price-success-row');
+ const expensive = { ...item, salePrice: 1000, wooPricePublication: { ...item.wooPricePublication, price: 1000 } };
+ assert.ok(productAudit(expensive).issues.some(issue => issue.code === 'large-gap'));
+ assert.equal(productAudit(expensive).critical, false);
+ assert.equal(productRowClass(expensive), 'source-review-row');
+ const loss = { ...item, salePrice: 80 };
+ assert.equal(productAudit(loss).critical, true);
+ assert.equal(productRowClass(loss), 'price-alert-row');
 });
 test('catalogue reuses precomputed audits and keeps recent valid publications first among green products', () => {
  const earlier = { ...published, id: 'earlier', wooPricePublication: { ...published.wooPricePublication, at: '2026-11-24T11:00:00Z' } };

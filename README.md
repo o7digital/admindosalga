@@ -220,10 +220,20 @@ Le tableau classe tout le catalogue avant pagination, avec 50 lignes par page.
 Les alertes rouges passent avant les autres fiches, y compris une ancienne validation
 verte lorsqu'une anomalie critique est détectée. Les filtres, compteurs et l'export CSV
 portent sur tous les résultats, et changer de filtre ramène à la première page.
+Pendant une intervention sur une ligne, le classement et les fiches du résultat courant
+sont conservés, même après publication ou sortie du filtre de révision. Les données et
+les couleurs continuent de s'actualiser. « Actualiser le classement » réapplique les
+filtres et les priorités ; changer de filtre libère aussi cet ordre conservé.
+Une réponse de catalogue démarrée avant une modification locale ne peut plus effacer
+le prix ou le brouillon qui vient d'être enregistré.
+Le champ de prix reprend le brouillon enregistré ou le prix de vente existant, même
+si les coûts CJ sont absents. Le prix calculé est appliqué uniquement sur demande.
 Les prix sont comparés
 après conversion dans une même devise (USD, taux configuré sur la fiche). Une ligne
-rouge signale un prix sous le coût CJ, une perte après transport/frais ou un prix
-au moins cinq fois supérieur au coût CJ (écart à vérifier, pas une erreur prouvée).
+rouge signale un prix absent, un prix sous le coût CJ ou une perte après transport/frais.
+Un prix au moins cinq fois supérieur au coût CJ et au transport inclus est un avertissement
+jaune, pas une erreur prouvée. La publication vérifiée reste indiquée près du prix de
+vente ; elle exige aussi que le montant et la devise affichés correspondent à la confirmation.
 Les devises ne sont jamais modifiées par les alertes. Le transport figure près du
 coût CJ ; zéro importé est affiché comme non confirmé. Le prix MXN affiche son
 équivalent USD et les conditions de livraison enregistrées.

@@ -30,9 +30,17 @@ export function CjCostCell({ product }) {
 
 export function SalePriceCell({ product, audit, publishedCurrent }) {
   const hasPrice = Number(product.salePrice) > 0;
+  const publication = product.wooPricePublication;
+  const verifiedPrice = publishedCurrent || (hasPrice && publication?.state === 'woo_verified'
+    && Number(publication.price) === Number(product.salePrice) && publication.currency === product.saleCurrency);
+  const draftPending = product.cjPriceProposal?.currency === product.saleCurrency
+    && !(verifiedPrice && publication?.proposalSavedAt === product.cjPriceProposal.savedAt);
   return <td className="number">
     <small className="new-sale-label">{hasPrice ? 'Prix final' : 'Prix de vente'}</small>
     <strong className="new-sale-price">{hasPrice ? formatCurrency(product.salePrice, product.saleCurrency) : 'Prix à définir'}</strong>
+    {verifiedPrice && <small className="included">✓ Prix publié dans WooCommerce</small>}
+    {verifiedPrice && product.pendingSourceChanges && <small className="separate">Données source à revérifier</small>}
+    {draftPending && <small className="separate">Brouillon : {formatCurrency(product.cjPriceProposal.price, product.cjPriceProposal.currency)} · non publié</small>}
     {publishedCurrent && <small className="old-sale-price">Old: {formatCurrency(product.wooPricePublication.previousPrice ?? product.previousSalePrice ?? product.sourcePrice, product.saleCurrency)}</small>}
     {hasPrice && product.saleCurrency === 'MXN' && <small className="usd-equivalent">≈ {formatCurrency(audit.saleUsd, 'USD')} · prix de vente</small>}
     {hasPrice && <small className="price-origin-railway">Prix d’origine Railway : {formatCurrency(product.sourcePrice, product.sourceCurrency)}</small>}

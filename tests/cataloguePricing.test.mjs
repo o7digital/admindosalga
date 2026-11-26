@@ -21,6 +21,7 @@ const loadComponent = file => {
 };
 const { CjCostCell, RailwayPriceCell, SalePriceCell } = loadComponent('ProductPriceCells');
 const VariantFreight = loadComponent('VariantFreight').default;
+const CjPriceCell = loadComponent('CjPriceCell').default;
 const render = (component, props) => renderToStaticMarkup(React.createElement(component, props));
 
 test('catalogue renders saved shipping and CJ variant costs when the parent fields are zero', () => {
@@ -59,4 +60,35 @@ test('existing validated sale prices retain their amounts, currency and publicat
   assert.match(registry, /Devise vérifiée par produit/);
   assert.match(sale, /Old: MX\$600\.00 MXN/);
   assert.match(sale, /\$33\.56 USD/);
+  assert.match(sale, /Prix publié dans WooCommerce/);
+});
+
+test('the price editor shows the existing price even without CJ costs and never substitutes a calculated suggestion', () => {
+  const product = { name: 'Cotton shirt', salePrice: 350, saleCurrency: 'MXN', shippingIncluded: true,
+    minDeliveryDays: 7, maxDeliveryDays: 14, cjCostUsd: 0, shippingUsd: 0 };
+  for (const item of [product, { ...product, cjCostUsd: 1, shippingUsd: 3, exchangeRate: 19.69 }]) {
+    const editor = render(CjPriceCell, { product: item });
+    assert.match(editor, /aria-label="WooCommerce price for Cotton shirt"[^>]*value="350"/);
+  }
+  const unpriced = render(CjPriceCell, { product: { ...product, salePrice: 0 } });
+  assert.match(unpriced, /aria-label="WooCommerce price for Cotton shirt"[^>]*value=""/);
+});
+
+test('a saved draft is visible separately from the current sale price until publication', () => {
+  const product = { name: 'Cotton shirt', salePrice: 350, saleCurrency: 'MXN',
+    cjPriceProposal: { price: 420, currency: 'MXN', savedAt: '2026-11-26T12:00:00Z' } };
+  assert.match(render(CjPriceCell, { product }), /aria-label="WooCommerce price for Cotton shirt"[^>]*value="420"/);
+  const sale = render(SalePriceCell, { product, audit: { saleUsd: 17.78 } });
+  assert.match(sale, /MX\$350\.00 MXN/);
+  assert.match(sale, /Brouillon : MX\$420\.00 MXN · non publié/);
+});
+
+test('source changes require review without claiming that the confirmed WooCommerce price was never published', () => {
+  const product = { salePrice: 350, saleCurrency: 'MXN', pendingSourceChanges: true,
+    cjPriceProposal: { price: 350, currency: 'MXN', savedAt: 'saved' },
+    wooPricePublication: { state: 'woo_verified', price: 350, currency: 'MXN', proposalSavedAt: 'saved' } };
+  const sale = render(SalePriceCell, { product, audit: { saleUsd: 17.78 }, publishedCurrent: false });
+  assert.match(sale, /Prix publié dans WooCommerce/);
+  assert.match(sale, /Données source à revérifier/);
+  assert.doesNotMatch(sale, /non publié/);
 });

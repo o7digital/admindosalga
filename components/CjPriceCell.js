@@ -3,12 +3,14 @@ import { calculateProductMargin, formatCurrency, formatPercent } from '@/lib/mar
 import { suggestCjPrice } from '@/lib/cjPricing.mjs';
 import { freightDeliveryRange } from '@/lib/variantFreight.mjs';
 import { sourceRevisionMap } from '@/lib/cjPublication.mjs';
+import { isPublishedCurrent } from '@/lib/productAlerts.mjs';
 
 export default function CjPriceCell({ product, onSaved, onPublished, disabled }) {
   const saved = product.cjPriceProposal?.currency === product.saleCurrency ? product.cjPriceProposal : null;
   const delivery = freightDeliveryRange(product);
   const [shippingIncluded, setShippingIncluded] = useState(saved?.shippingIncluded ?? product.shippingIncluded ?? true);
-  const [price, setPrice] = useState(saved?.price ?? suggestCjPrice(product, shippingIncluded) ?? '');
+  const currentPrice = Number(product.salePrice) > 0 ? product.salePrice : '';
+  const [price, setPrice] = useState(saved?.price ?? currentPrice);
   const [minDays, setMinDays] = useState(saved?.minDeliveryDays ?? delivery?.min ?? product.minDeliveryDays ?? '');
   const [maxDays, setMaxDays] = useState(saved?.maxDeliveryDays ?? delivery?.max ?? product.maxDeliveryDays ?? '');
   const touched = useRef(false);
@@ -23,15 +25,21 @@ export default function CjPriceCell({ product, onSaved, onPublished, disabled })
   const margin = calculateProductMargin({ ...product, salePrice: Number(price), shippingIncluded });
   const unchanged = saved && Number(price) === saved.price && shippingIncluded === saved.shippingIncluded
     && Number(minDays) === saved.minDeliveryDays && Number(maxDays) === saved.maxDeliveryDays;
-  const publishedCurrent = unchanged && !product.pendingSourceChanges && publication?.state === 'woo_verified' && publication?.proposalSavedAt === saved?.savedAt;
+  const publishedCurrent = unchanged && isPublishedCurrent({ ...product, wooPricePublication: publication });
   const publicationBlocked = ['sending', 'unknown'].includes(publication?.state);
 
   useEffect(() => {
-    if (!touched.current && !saved && suggestion !== null) setPrice(suggestion);
-  }, [suggestion, saved]);
+    if (!touched.current) {
+      setPrice(saved?.price ?? currentPrice);
+      setShippingIncluded(saved?.shippingIncluded ?? product.shippingIncluded ?? true);
+    }
+  }, [saved?.savedAt, saved?.price, saved?.shippingIncluded, currentPrice, product.shippingIncluded]);
   useEffect(() => {
-    if (!etaTouched.current && !saved && delivery) { setMinDays(delivery.min); setMaxDays(delivery.max); }
-  }, [delivery?.min, delivery?.max, saved]);
+    if (!etaTouched.current) {
+      setMinDays(saved?.minDeliveryDays ?? delivery?.min ?? product.minDeliveryDays ?? '');
+      setMaxDays(saved?.maxDeliveryDays ?? delivery?.max ?? product.maxDeliveryDays ?? '');
+    }
+  }, [delivery?.min, delivery?.max, saved?.savedAt, saved?.minDeliveryDays, saved?.maxDeliveryDays, product.minDeliveryDays, product.maxDeliveryDays]);
 
   const suggestAi = async () => {
     setSuggesting(true); setError('');
@@ -56,6 +64,8 @@ export default function CjPriceCell({ product, onSaved, onPublished, disabled })
     });
     const result = await response.json();
     if (!response.ok) throw new Error(result.message || 'Enregistrement impossible.');
+    touched.current = false;
+    etaTouched.current = false;
     onSaved(product.id, result.proposal);
     return result.proposal;
   };
