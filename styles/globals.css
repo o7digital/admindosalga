@@ -135,6 +135,11 @@ h1 { font-size: clamp(27px, 2.2vw, 38px); margin: 9px 0 4px; letter-spacing: 0; 
 .select-wrap svg { position: absolute; right: 9px; pointer-events: none; }
 .result-count { margin-left: auto; color: #a0a2a6; font-size: 9px; }
 .table-wrap { width: 100%; overflow-x: auto; }
+.catalogue-pagination { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; padding: 14px 20px; color: #64676d; font-size: 11px; border-top: 1px solid #eeece7; }
+.catalogue-pagination > div { display: flex; align-items: center; gap: 12px; }
+.catalogue-pagination button { border: 1px solid #d8d4ce; border-radius: 5px; background: #fff; padding: 7px 10px; color: #292b30; cursor: pointer; }
+.catalogue-pagination button:disabled { opacity: .45; cursor: default; }
+.catalogue-pagination button:focus-visible { outline: 2px solid #276d55; outline-offset: 2px; }
 table { width: 100%; border-collapse: collapse; min-width: 1460px; table-layout: auto; }
 thead { background: #faf9f7; }
 th { height: 39px; color: #929499; font-size: 8px; letter-spacing: .07em; text-transform: uppercase; text-align: left; padding: 0 11px; white-space: nowrap; font-weight: 700; }

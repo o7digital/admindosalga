@@ -1,17 +1,20 @@
 import VariantFreight from '@/components/VariantFreight';
 import { freightShippingTotal } from '@/lib/variantFreight.mjs';
-import { productAudit, compareProductPriority } from '@/lib/productAlerts.mjs';
+import { productAudit, compareCataloguePriority, isPublishedCurrent, productRowClass } from '@/lib/productAlerts.mjs';
+import { createCatalogueRefresher } from '@/lib/catalogueRefresh.mjs';
 import { convertSourcePrice, normalizeWooPrice } from '@/lib/wooPricing.mjs';
 import Head from 'next/head';
 import CjPriceCell from '@/components/CjPriceCell';
 import CatalogSources from '@/components/CatalogSources';
-import { useEffect, useMemo, useState } from 'react';
+import CataloguePagination from '@/components/CataloguePagination';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import AccountMenu from '@/components/AccountMenu';
 import { calculateProductMargin, formatCurrency, formatPercent } from '@/lib/margins';
 
 const logoUrl = 'https://www.dosalga.store/logo-dosalga.png';
 const cjBatchSize = 4;
 const productsCacheKey = 'dosalga-admin-products-v2';
+const productsPageSize = 50;
 
 const blankProduct = {
   siteId: 'dosalga-usa',
@@ -117,9 +120,10 @@ function marketFor(product) {
   return product.siteId === 'dosalga-usa' ? 'USA' : 'México';
 }
 
-function needsProductReview(product) {
+function needsProductReview(product, audit) {
   return product.pendingSourceChanges || product.stock <= 10
     || Boolean(product.cjChangeReport?.length)
+    || audit?.critical
     || calculateProductMargin(product).marginRate < 0.25;
 }
 
@@ -267,7 +271,11 @@ function SociosDashboard({ market, notify }) {
 }
 
 export default function ProductControl({ user }) {
-  const [products, setProducts] = useState([]);
+  const [storedProducts, setProducts] = useState([]);
+  const [productsLoading, setProductsLoading] = useState(true);
+  const [productPage, setProductPage] = useState(1);
+  const productsRequest = useRef(null);
+  const catalogRefresher = useRef(null);
   const [orders, setOrders] = useState([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [activeView, setActiveView] = useState('Products');
@@ -278,6 +286,11 @@ export default function ProductControl({ user }) {
   const [shippingFilter, setShippingFilter] = useState('All shipping');
   const [marginFilter, setMarginFilter] = useState('All margins');
   const [fx, setFx] = useState(null);
+  const products = useMemo(() => fx?.rate && !fx.stale ? storedProducts.map(product => ({
+    ...product, storedExchangeRate: product.exchangeRate, exchangeRate: fx.rate,
+    fxRateDate: fx.date, fxSource: fx.source,
+  })) : storedProducts, [storedProducts, fx]);
+  const productAudits = useMemo(() => new Map(products.map(product => [product, productAudit(product)])), [products]);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(blankProduct);
   const [syncing, setSyncing] = useState(false);
@@ -316,36 +329,45 @@ export default function ProductControl({ user }) {
     }
   };
 
-  const loadProducts = async () => {
+  const loadProducts = () => {
+    if (productsRequest.current) return productsRequest.current;
+    productsRequest.current = fetchProducts().finally(() => {
+      productsRequest.current = null;
+      setProductsLoading(false);
+    });
+    return productsRequest.current;
+  };
+
+  const fetchProducts = async () => {
     const response = await fetch(`/api/products?fresh=${Date.now()}`, { cache: 'no-store' });
     const result = await response.json();
     if (!response.ok) throw new Error(result.message || 'Products could not be loaded.');
-    let cachedProducts = null;
-
-    try {
-      const cached = JSON.parse(window.localStorage.getItem(productsCacheKey) || 'null');
-      cachedProducts = Array.isArray(cached?.products) ? cached.products : null;
-    } catch {
-      cachedProducts = null;
+    let nextProducts = Array.isArray(result.products) ? result.products : [];
+    if (result.source !== 'postgresql') {
+      try {
+        const cached = JSON.parse(window.localStorage.getItem(productsCacheKey) || 'null');
+        if (Array.isArray(cached?.products)) nextProducts = cached.products;
+      } catch {
+        // PostgreSQL is authoritative; local storage is only a JSON-dev fallback.
+      }
     }
-
-    const serverProducts = Array.isArray(result.products) ? result.products : [];
-    const nextProducts = result.source === 'postgresql'
-      ? serverProducts
-      : (cachedProducts || serverProducts);
     setProducts(nextProducts.map(normalizeProduct));
-    if (result.source === 'postgresql') persistProducts(nextProducts);
   };
 
-  const refreshCatalog = async () => {
-    try {
-      const response = await fetch('/api/wp/intake', { method: 'POST' });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.message || 'Les nouveaux produits n’ont pas pu être importés.');
-    } finally {
-      await loadProducts();
-      await loadWpSyncStatus().catch(() => {});
+  const refreshCatalog = () => {
+    if (!catalogRefresher.current) {
+      catalogRefresher.current = createCatalogueRefresher({
+        loadProducts,
+        importProducts: async () => {
+          const response = await fetch('/api/wp/intake', { method: 'POST' });
+          const result = await response.json();
+          if (!response.ok) throw new Error(result.message || 'Les nouveaux produits n’ont pas pu être importés.');
+          return result;
+        },
+        loadStatus: () => loadWpSyncStatus().catch(() => {}),
+      });
     }
+    return catalogRefresher.current();
   };
 
   const loadCjConnection = async () => {
@@ -460,22 +482,16 @@ export default function ProductControl({ user }) {
     const marginMatch = marginFilter === 'All margins' || (marginFilter === 'Under 35%' ? margin < 0.35 : margin >= 0.35);
     const searchMatch = !q || `${product.name} ${product.brand} ${product.category} ${product.sku} ${product.cjSku} ${product.pid} ${(product.variations || []).map((variation) => `${variation.name || ''} ${variation.sku || ''}`).join(' ')}`.toLowerCase().includes(q);
     return marketMatch && categoryMatch && shippingMatch && marginMatch && searchMatch;
-  }).sort((a, b) => {
-    const aPublished = a.wooPricePublication?.state === 'woo_verified'
-      && a.wooPricePublication?.proposalSavedAt === a.cjPriceProposal?.savedAt;
-    const bPublished = b.wooPricePublication?.state === 'woo_verified'
-      && b.wooPricePublication?.proposalSavedAt === b.cjPriceProposal?.savedAt;
-    return Number(bPublished) - Number(aPublished)
-      || String(b.wooPricePublication?.at || '').localeCompare(String(a.wooPricePublication?.at || ''))
-      || compareProductPriority(a, b);
-  }), [category, marginFilter, market, products, query, shippingFilter]);
+  }).sort((a, b) => compareCataloguePriority(a, b, productAudits.get(a), productAudits.get(b))), [category, marginFilter, market, products, productAudits, query, shippingFilter]);
 
   const filtered = useMemo(() => catalogFiltered.filter((product) => {
     if (productTab === 'active') return product.status === 'approved' || product.status === 'ordered';
-    if (productTab === 'review') return needsProductReview(product);
+    if (productTab === 'review') return needsProductReview(product, productAudits.get(product));
     if (productTab === 'drafts') return product.status === 'review';
     return true;
-  }), [catalogFiltered, productTab]);
+  }), [catalogFiltered, productAudits, productTab]);
+
+  useEffect(() => { setProductPage(1); }, [market, productTab, query, category, shippingFilter, marginFilter]);
 
   const selectProductTab = (tab) => {
     setProductTab(tab);
@@ -491,9 +507,9 @@ export default function ProductControl({ user }) {
     const included = active.filter((product) => product.shippingIncluded).length;
     const margins = active.map((product) => calculateProductMargin(product).marginRate);
     const averageMargin = margins.length ? margins.reduce((sum, value) => sum + value, 0) / margins.length : 0;
-    const attention = active.filter(needsProductReview).length;
+    const attention = active.filter(product => needsProductReview(product, productAudits.get(product))).length;
     return { active: active.length, included, averageMargin, attention };
-  }, [filtered]);
+  }, [filtered, productAudits]);
 
   const routeSummary = useMemo(() => {
     const routes = new Map();
@@ -549,7 +565,11 @@ export default function ProductControl({ user }) {
     unmatched: visibleOrders.reduce((sum, order) => sum + order.unmatchedItems, 0),
   }), [visibleOrders]);
 
-  const pageProducts = filtered;
+  const productPageCount = Math.max(1, Math.ceil(filtered.length / productsPageSize));
+  const currentProductPage = Math.min(productPage, productPageCount);
+  const pageProducts = filtered.slice((currentProductPage - 1) * productsPageSize, currentProductPage * productsPageSize);
+  const paginationProps = { page: currentProductPage, pageCount: productPageCount, total: filtered.length,
+    pageSize: productsPageSize, onPage: setProductPage };
   const currentMargin = calculateProductMargin(editingProduct);
   const cjStatusLabel = cjConnection.mode === 'checking'
     ? 'Checking'
@@ -1052,7 +1072,7 @@ export default function ProductControl({ user }) {
               <div className="catalog-head"><div className="tabs" role="tablist" aria-label="Product status filters">
                 <button type="button" role="tab" aria-selected={productTab === 'all'} className={`tab ${productTab === 'all' ? 'active' : ''}`} onClick={() => selectProductTab('all')}>All products <span>{catalogFiltered.length}</span></button>
                 <button type="button" role="tab" aria-selected={productTab === 'active'} className={`tab ${productTab === 'active' ? 'active' : ''}`} onClick={() => selectProductTab('active')}>Active <span>{catalogFiltered.filter((p) => p.status === 'approved' || p.status === 'ordered').length}</span></button>
-                <button type="button" role="tab" aria-selected={productTab === 'review'} className={`tab alert-tab ${productTab === 'review' ? 'active' : ''}`} onClick={() => selectProductTab('review')}>⚠ Needs review <span>{catalogFiltered.filter(needsProductReview).length}</span></button>
+                <button type="button" role="tab" aria-selected={productTab === 'review'} className={`tab alert-tab ${productTab === 'review' ? 'active' : ''}`} onClick={() => selectProductTab('review')}>⚠ Needs review <span>{catalogFiltered.filter(product => needsProductReview(product, productAudits.get(product))).length}</span></button>
                 <button type="button" role="tab" aria-selected={productTab === 'drafts'} className={`tab draft-tab ${productTab === 'drafts' ? 'active' : ''}`} onClick={() => selectProductTab('drafts')}>Drafts <span>{catalogFiltered.filter((p) => p.status === 'review').length}</span></button>
               </div><button className="export" onClick={exportCsv}><Icon name="upload" /> Export CSV</button></div>
               <div className="filters">
@@ -1061,19 +1081,19 @@ export default function ProductControl({ user }) {
                 <label className="select-wrap"><select value={shippingFilter} onChange={(event) => setShippingFilter(event.target.value)}><option>All shipping</option><option>Included</option><option>Separate</option></select><Icon name="chevron" size={15} /></label>
                 <label className="select-wrap"><select value={marginFilter} onChange={(event) => setMarginFilter(event.target.value)}><option>All margins</option><option>Under 35%</option><option>35% and up</option></select><Icon name="chevron" size={15} /></label>
                 <div className="daily-fx-badge">{fx?.rate ? <><a href={fx.sourceUrl} target="_blank" rel="noreferrer">Taux officiel DOF · 1 USD = {Number(fx.rate).toFixed(4)} MXN</a><small>1 MXN = {(1 / Number(fx.rate)).toFixed(6)} USD · Dernière publication : {fx.date}</small><small>{fx.stale ? '⚠ Actualisation indisponible · dernier taux récupéré' : 'Actualisation automatique · vérification chaque heure'}</small></> : 'Taux officiel DOF indisponible'}</div>
-                <span className="result-count">{filtered.length} shown · Priority first</span>
+                <span className="result-count">{filtered.length} produits · Rouges en priorité</span>
               </div>
+              <CataloguePagination {...paginationProps} />
               <div className="table-wrap">
                 <table>
                   <thead><tr><th className="product-col">Product / brand</th><th>Store</th><th>FX Shipping COST · USD</th><th>Railway price</th><th>CJ cost USD</th><th>Sale price</th><th>Update WooCommerce price</th><th>Temu</th><th>Amazon</th><th>Route & ETA</th><th>Stock</th><th>Margin</th><th>Editor</th><th>Sync</th><th /></tr></thead>
                   <tbody>{pageProducts.map((product) => {
                     const margin = calculateProductMargin(product);
                     const percent = Math.round(margin.marginRate * 100);
-                    const audit = productAudit(product);
-                    const publishedCurrent = product.wooPricePublication?.state === 'woo_verified'
-                      && product.wooPricePublication?.proposalSavedAt === product.cjPriceProposal?.savedAt;
+                    const audit = productAudits.get(product);
+                    const publishedCurrent = isPublishedCurrent(product);
                     return (
-                      <tr key={product.id} className={product.pendingSourceChanges ? 'source-review-row' : publishedCurrent ? 'price-success-row' : audit.critical ? 'price-alert-row' : ''}>
+                      <tr key={product.id} className={productRowClass(product, audit)}>
                         <td><div className="product-cell"><ProductVisual product={product} /><div><strong>{product.productUrl ? <a href={product.productUrl} target="_blank" rel="noreferrer">{product.name}</a> : product.name}</strong><span>{product.brand} · {product.sku}</span>{product.marketImport?.status === 'pending_us_review' && <small className="status review">Import MX · prix et livraison US à préparer{product.marketImport.sourceBlocked ? ' · source bloquée' : ''}</small>}<small className={`status ${product.wooFrozen ? 'blocked' : product.status === 'paused' || product.status === 'review' ? 'review' : product.stock <= 10 ? 'low-stock' : ''}`}>{product.wooFrozen ? 'Bloqué dans WooCommerce' : product.status}</small>{audit.issues.length > 0 && <small className="product-alert-reason">⚠ {audit.issues[0].message}</small>}<CatalogSources product={product} />{product.wooFrozen ? <span className="sale-blocked-badge">⛔ Vente bloquée</span> : <button type="button" className="block-sale-button" disabled={blockingProductId === product.id} onClick={() => blockProductSale(product)}>{blockingProductId === product.id ? 'Blocage…' : 'Bloquer la vente'}</button>}</div></div></td>
                         <td><span className={`market-badge ${marketFor(product) === 'USA' ? 'usa' : 'mexico'}`}>{marketFor(product) !== 'Both' && <span className={`flag ${marketFor(product) === 'USA' ? 'us' : 'mx'}`} />}{marketFor(product)}</span></td>
                         <td className="shipping-cost-cell"><VariantFreight product={product} onUpdated={(id, freight) => setProducts(current => current.map(item => item.id === id ? { ...item, variantFreight: freight } : item))} /></td>
@@ -1096,10 +1116,10 @@ export default function ProductControl({ user }) {
                         <td><button className="row-menu" onClick={() => openEditProduct(product)} aria-label={`Edit ${product.name}`}><Icon name="dots" /></button></td>
                       </tr>
                     );
-                  })}{!pageProducts.length && <tr><td colSpan={15} className="empty">No products match these filters.</td></tr>}</tbody>
+                  })}{!pageProducts.length && <tr><td colSpan={15} className="empty" role="status">{productsLoading ? 'Chargement des produits…' : error ? 'Chargement impossible. Réessayez en actualisant la page.' : 'No products match these filters.'}</td></tr>}</tbody>
                 </table>
               </div>
-              <footer className="table-footer"><span>Affichage de {filtered.length} produits correspondant aux filtres</span></footer>
+              <CataloguePagination {...paginationProps} />
             </section>}
           </div>
         </section>

@@ -210,7 +210,17 @@ Champs principaux:
 
 ## Alertes prix et Olivia One
 
-Le tableau classe les fiches par priorité avant pagination. Les prix sont comparés
+Le catalogue affiche les données enregistrées avant de lancer l'import des nouveautés.
+Les rafraîchissements simultanés partagent une seule opération ; une seconde lecture
+n'est nécessaire que si l'import a ajouté des produits. Le service DOF est chargé
+séparément : les fiches utilisent d'abord leur taux enregistré, puis le dernier taux
+officiel disponible pour les calculs affichés, sans modifier les prix enregistrés.
+
+Le tableau classe tout le catalogue avant pagination, avec 50 lignes par page.
+Les alertes rouges passent avant les autres fiches, y compris une ancienne validation
+verte lorsqu'une anomalie critique est détectée. Les filtres, compteurs et l'export CSV
+portent sur tous les résultats, et changer de filtre ramène à la première page.
+Les prix sont comparés
 après conversion dans une même devise (USD, taux configuré sur la fiche). Une ligne
 rouge signale un prix sous le coût CJ, une perte après transport/frais ou un prix
 au moins cinq fois supérieur au coût CJ (écart à vérifier, pas une erreur prouvée).

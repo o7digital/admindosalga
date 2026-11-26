@@ -1,5 +1,4 @@
 import { withAuth } from '@/lib/adminAuth';
-import { getLatestOfficialRate } from '@/lib/officialExchangeRate.mjs';
 import { normalizeWooPrice } from '@/lib/wooPricing.mjs';
 import fs from 'fs/promises';
 import path from 'path';
@@ -78,11 +77,9 @@ async function handler(req, res) {
     if (req.method === 'GET') {
       res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
       const products = databaseIsAvailable() ? await listDatabaseProducts() : await readProducts();
-      const official = await getLatestOfficialRate().catch(() => null);
-      const normalized = products.map(normalizeWooPrice).map(product => official && !official.stale ? {
-        ...product, storedExchangeRate: product.exchangeRate, exchangeRate: official.rate,
-        fxRateDate: official.date, fxSource: official.source,
-      } : product);
+      // The official rate has its own endpoint. A slow DOF response must not
+      // delay the catalogue; return each product's saved rate here.
+      const normalized = products.map(normalizeWooPrice);
       return res.status(200).json({ products: normalized, source: databaseIsAvailable() ? 'postgresql' : 'json' });
     }
 
